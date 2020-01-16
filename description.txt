@@ -1,0 +1,6 @@
+Group Transit
+
+These models are edited by different developers who can update independently their changes on GitHub. Ideally each modeller should maintain the most updated working version on GitHub to be shared with the others. 
+The repository is located here: https://github.com/marcov64/Transit
+
+The project starts by the Florian's version Transit-1 released on Jan 15, 2020
