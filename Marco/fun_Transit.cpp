@@ -1,3 +1,4 @@
+#define NO_POINTER_INIT
 #include "fun_head_fast.h"
 extern char msg[];
 MODELBEGIN
@@ -166,23 +167,18 @@ v[0]=AVE("markup");
 
 RESULT(v[0] )
 
-EQUATION("TotKNbrWorkers")
-/*
-*/
-v[0]=SUM("KNbrWorkers");
-
-RESULT(v[0] )
-
 EQUATION("TotKLaborForce")
 /*
 */
-v[0]=SUM("LaborForce");
+V("Demography");
+v[0]=SUM("KLaborForce");
 
 RESULT(v[0] )
 
 EQUATION("TotLaborForce")
 /*
 */
+V("Demography");
 v[0]=SUM("LaborForce");
 
 RESULT(v[0] )
@@ -3199,7 +3195,7 @@ if(v[14]==1)
   v[6]=v[0]+v[28];
   v[33]=(v[3]>v[6])?(v[3]-v[6]):0; //number of vacancies for the first layer, if there are more desired workers than actual new hires
   WRITES(p->up,"Vacancies",v[33]);
-  v[54]=v[33]/v[6];//ratio of vacancies to actual workers
+  v[54]=v[33]/(v[6]+v[0]);//ratio of vacancies to actual workers
   WRITES(p->up,"RatioVacancies",v[54]);
  }
 
@@ -4989,7 +4985,7 @@ Unemployment: to account for Beveridge curves we could use the suggishness in th
 NOTE: probably it makes sense to use levels for all variables. That is, when the variable reaches a certain level, a wage resetting is unedergone: if inflation runs too high, wages are renegotiated, if aggregate productivity increase evidently, wage are renegotiated.
 
 */
-V("NbrWorkers");
+//V("NbrWorkers");
 v[0]=VL("MinWage",1);
 //END_EQUATION(v[0]);
 v[10]=V("InitAggProd"); //the reference level of productivity 
@@ -5379,6 +5375,7 @@ EQUATION("NbrWorkers")
 
 */
 
+V("Demography");
 v[3]=v[8]=0;
 CYCLE(cur2, "Supply")
  {
@@ -5410,6 +5407,12 @@ CYCLE(cur, "KFirm")
   v[8]+=v[7];
  }
 
+v[10] = V("TotLaborForce");
+v[11] = V("TotKLaborForce");
+v[12]=v[11]+v[10];
+//if( abs(v[12]-v[3])>0.001)
+ //INTERACT("Labor force error", v[12]);
+//LOG("%lf \t%lf\n", v[12],v[3]);
 RESULT(v[3] )
 
 
