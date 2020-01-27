@@ -118,6 +118,11 @@ v[5]=v[3]*log(v[4]);
 if(v[5]>1)
 	v[5]=1;
 
+if(v[5]<0.2)
+ v[5]=0.2;
+if(v[5]>0.8)
+ v[5]=0.8;
+ 
 //v[6]=VL("aNW",1);
 //INTERACT("aNW 1", v[6]);
 //v[7]=0.1*v[5]+0.9*v[6];
@@ -3170,18 +3175,13 @@ if(v[14]==1)
   v[3]=v[4]*(v[9]/v[2]);
   v[5]=V("aNW");
   v[6]=v[0]*v[5]+(1-v[5])*v[3]; // number of workers in the first layer
-  v[26] = V("MaxNumWorkers");
-  v[27] = VL("NbrWorkers",1);
+  v[26] = VL("UnemploymentRate",1);
   v[28]=v[6]-v[0];
   if(v[28]>0)
    {
-    if(v[27]<v[26])
-     v[28]*=(v[26]-v[27])/v[26];
-    else
-     v[28]=0; 
+     v[28]*=v[26];
+     v[6]=v[0]+v[28];
    }
-  else
-   v[28]=0; 
   
 /*
     if(v[6]/v[0]-1 > 1+V("NumWorkersMaxGr") )
@@ -3192,10 +3192,10 @@ if(v[14]==1)
   		}
   	}
 */  
-  v[6]=v[0]+v[28];
+  
   v[33]=(v[3]>v[6])?(v[3]-v[6]):0; //number of vacancies for the first layer, if there are more desired workers than actual new hires
   WRITES(p->up,"Vacancies",v[33]);
-  v[54]=v[33]/(v[6]+v[0]);//ratio of vacancies to actual workers
+  v[54]=v[33]/(v[6]);//ratio of vacancies to actual workers
   WRITES(p->up,"RatioVacancies",v[54]);
  }
 
@@ -4862,7 +4862,16 @@ if(v[14]==1)
   v[3]=v[4]*(v[1]/v[2]);
   v[5]=V("KaNW");
   v[6]=v[0]*v[5]+(1-v[5])*v[3];
-  v[33]=v[3]>v[6]?v[3]-v[6]:0;
+  
+  v[26] = VL("UnemploymentRate", 1);
+  v[28]=v[6]-v[0];
+  if(v[28]>0)
+   {
+    v[28]*=v[26];
+    v[6]=v[0]+v[28];
+   } 
+   
+  v[33]=v[3]>v[6]?v[3]-v[6]:0;   
   v[54]=v[33]/v[6];
   WRITES(p->up,"KVacancies",v[33]);
   WRITES(p->up,"KRatioVacancies",v[54]);
@@ -5343,7 +5352,14 @@ v[4]=v[1]+pow(v[3],3*v[2]+0.5);
 //Hyperbolic
 v[4]=(v[1]+v[3]/(v[2]+0.2));
 
-RESULT(v[4] )
+v[12] = VL("NbrWorkers",1);
+v[13] = V("MaxNumWorkers");
+
+v[14]=(v[13]-v[12])/v[13];
+
+LOG("%lf \t %lf \n",v[4],v[14]);
+v[15]=v[14]<0?0:v[14];
+RESULT(v[15] )
 
 EQUATION("LTUnemployment")
 /*
