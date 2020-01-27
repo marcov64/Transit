@@ -2,6 +2,13 @@
 extern char msg[];
 MODELBEGIN
 
+EQUATION("AvMaxEfficiency")
+/*
+*/
+v[1]=AVE("MaxEfficiency");
+
+RESULT(v[1] )
+
 EQUATION("AvActualGreenEnergyCost")
 /*
 Weighted average of green energy cost
@@ -748,7 +755,13 @@ v[5]=V("MinWage");
 v[6]=v[3]/v[2]-1; //compute the growth rate of priceEN
 v[7]=v[5]/v[4]-1; //compute the growth rate of MinWage
 v[10]=v[0]*(1+(v[6]-v[7])*v[1]);
-RESULT(v[10] )
+
+if(t>2)
+{v[11]=v[10];}
+else
+{v[11]=v[0];}
+
+RESULT(v[11] )
 
 EQUATION("betaProd")
 /*
@@ -2255,6 +2268,11 @@ WRITELS(cur4,"IncLearningK",1,t);
 WRITELS(cur4,"IncSkillBiais",0.2,t);
 WRITELS(cur4,"KAge",0,t);
 WRITELS(cur4,"MaxKQ",0,t);
+
+v[50]=V("AvMaxEfficiency");
+//INTERACT("AvEff",v[50]);
+WRITELS(cur4,"IncEfficiency",v[50],t);
+
 
 cur5=SEARCHS(cur1,"blItem");
 WRITES(cur5,"blPrice",0.5*V("AvPrice"));
@@ -4168,8 +4186,16 @@ CYCLE_SAFE(cur, "Capital")
 //  else
 //   DELETE(cur); 
 
+  v[25]=VS(cur, "IncEfficiency");
+	v[20]+=(v[7]*v[25]);
+
+
+
 }
 v[8]=v[0]/v[1];//Max Labor productivity computed as the weighted average of the incorporated productivity in every capital vintages
+
+v[28]=v[20]/v[1];
+WRITE("MaxEfficiency", v[28]);
 
 //v[50]=v[1]/v[40];
 //WRITE("CapitalStock",v[1]);
@@ -4647,7 +4673,7 @@ CYCLE(cur, "KFirm")
     v[33]=0;
   else 
     // Do not include energy price and minimum wage here
-    v[33]=pow(v[28],v[31])*pow(v[29],-v[32])*pow(v[27],-v[30])*pow(v[16],-v[11]);
+    v[33]=pow(v[28],v[31])*pow(v[29],-v[32])*pow(v[27],-v[30])*pow(v[16],v[11]);
   //v[33]=pow(v[28]*v[17],v[31])*pow(v[29],-v[32])*pow(v[27],-v[30])*pow(v[16]*v[18],v[11]); // Includes priceEN and MinWage
   WRITES(cur,"kselect",v[33]*VS(cur,"kapp"));
   v[70]+=v[33];
