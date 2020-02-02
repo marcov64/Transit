@@ -3,6 +3,7 @@
 extern char msg[];
 MODELBEGIN
 
+
 EQUATION("AvActualGreenEnergyCost")
 /*
 Weighted average of green energy cost
@@ -128,6 +129,7 @@ if(v[5]>0.8)
 //v[7]=0.1*v[5]+0.9*v[6];
 
 //RESULT(v[3]*log(v[2]+1) ) 
+
 RESULT(v[5] ) 
 
 
@@ -2257,9 +2259,20 @@ WRITELS(cur4,"IncSkillBiais",0.2,t);
 WRITELS(cur4,"KAge",0,t);
 WRITELS(cur4,"MaxKQ",0,t);
 
-cur5=SEARCHS(cur1,"blItem");
-WRITES(cur5,"blPrice",0.5*V("AvPrice"));
+//cur5=SEARCHS(cur1,"blItem");
+//WRITES(cur5,"blPrice",0.5*V("AvPrice"));
 
+WRITES(cur1, "numBLI", 0);
+
+v[44]=0;
+CYCLE_SAFES(cur1, cur, "blItem")
+{
+	if(v[44]==1)
+	 DELETE(cur);
+	else
+	 WRITES(cur, "blQ", 0); 
+	v[44]=1;
+}
 
 
 
@@ -2973,7 +2986,7 @@ if(v[0]>v[1]+v[3] && v[2]>0)
        }    
      }
     } 
- /****   
+ /****/   
   v[78]=v[79]=0; 
   CYCLE(cur, "blItem")
     {v[78]++;
@@ -2984,7 +2997,7 @@ if(v[0]>v[1]+v[3] && v[2]>0)
     } 
   if(v[78]-v[79]!=V("numBLI") )
    INTERACT("WRONG numBLI",v[78]);
- ***********/     
+ /***********/     
   v[2]-=v[5];
   WRITE("backlogSales",v[6]);
   v[21]=1;
@@ -3178,7 +3191,7 @@ if(v[14]==1)
   v[26] = VL("UnemploymentRate",1);
   v[28]=v[6]-v[0];
   if(v[28]>0)
-   {
+   {//if increasing
      v[28]*=v[26];
      v[6]=v[0]+v[28];
    }
@@ -3783,8 +3796,13 @@ Total income from the wage
 
 v[1]=V("TotWage");
 v[2]=V("TotPremia");
+v[3]=0;
+CYCLE(cur, "Class")
+{
+	v[3] += VS(cur, "Income");
+}
 
-RESULT(v[1]+v[2] )
+RESULT(v[3] )
 
 EQUATION("TotWage")
 /*
@@ -5357,7 +5375,7 @@ v[13] = V("MaxNumWorkers");
 
 v[14]=(v[13]-v[12])/v[13];
 
-LOG("%lf \t %lf \n",v[4],v[14]);
+//LOG("%lf \t %lf \n",v[4],v[14]);
 v[15]=v[14]<0?0:v[14];
 RESULT(v[15] )
 
@@ -7114,9 +7132,18 @@ CYCLE(cur, "KFirm")
   {
   CYCLES(cur, cur1, "Order")
    {
-    v[5]=VS(cur1,"IdClient");
-    cur3=SEARCH_CND("IdFirm",v[5]);
-    cur1->hook=cur3;
+    if(VS(cur1, "GreenOrder")==0)
+     {
+      v[5]=VS(cur1,"IdClient");
+      cur3=SEARCH_CND("IdFirm",v[5]);
+      cur1->hook=cur3;
+     } 
+    else
+     {
+      cur3 = SEARCH("Energy");
+      cur1->hook=cur3;
+     
+     } 
    }
   } 
   else
@@ -7182,6 +7209,8 @@ CYCLE(cur, "Firm")
 }
 
 RESULT(1 )
+
+
 
 
 MODELEND
