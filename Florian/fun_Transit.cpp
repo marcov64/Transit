@@ -2,27 +2,340 @@
 extern char msg[];
 MODELBEGIN
 
+
+// Decentralized energy sector //##################################################
+
+EQUATION("AvENPrice")
+/*
+Average production price of GreenF and BrownF (used to distribute demand)
+*/
+
+v[0]=SUM("GreenENPrice");
+v[1]=SUM("BrownENPrice");
+v[2]=COUNT("GreenF");
+v[3]=COUNT("BrownF");
+
+v[4]=(v[0]+v[1])/(v[2]+v[3]);
+
+RESULT(v[4] )
+
+
+
+EQUATION("AvGreenENPrice")
+/*
+ Average production price of GreenF 
+*/
+
+RESULT(AVE("GreenENPrice") )
+
+
+
+EQUATION("AvBrownENPrice")
+/*
+ Average production price of BrownF 
+*/
+
+RESULT(AVE("BrownENPrice") )
+
+
+
+EQUATION("NbrGreenF")
+/*
+Number of GreenF
+*/
+
+RESULT(COUNT("GreenF") )
+
+
+
+EQUATION("NbrBrownF")
+/*
+Number of BrownF
+*/
+
+RESULT(COUNT("BrownF") )
+
+
+
+EQUATION("NbrENFirms")
+/*
+Sum of GreenF and BrownF
+*/
+
+v[0]=V("NbrGreenF");
+v[1]=V("NbrBrownF");
+
+RESULT(v[0]+v[1] )
+
+
+
+EQUATION("ENGreenGrade")
+/*
+A grade that indicate relative position of energy producers regading price, energy type and preferences
+*/
+v[0]=V("betaENPrice");
+v[1]=V("betaENType");
+v[2]=V("GreenENPrice");
+v[3]=V("AvGreenENPrice");
+v[4]=V("NbrENFirms");
+v[5]=v[2]/v[3]; // Normalize price
+v[6]=pow(v[5],v[0])*pow(1,v[1]); // 1 is for green energy (0.5 for brown)
+
+RESULT(v[6] )
+
+
+
+EQUATION("ENBrownGrade")
+/*
+A grade that indicate relative position of energy producers regading price, energy type and preferences
+*/
+v[0]=V("betaENPrice");
+v[1]=V("betaENType");
+v[2]=V("BrownENPrice");
+v[3]=V("AvGreenENPrice");
+v[4]=V("NbrENFirms");
+v[5]=v[2]/v[3]; // Normalize price
+v[6]=pow(v[5],v[0])*pow(0.5,v[1]); // 0.5 is for brown energy 1( for green)
+
+RESULT(v[6] )
+
+
+
+EQUATION("SumENGrade")
+/*
+Sum of ENGreenGrade and ENBrownGrade
+*/
+
+v[0]=SUM("ENGreenGrade");
+v[1]=SUM("ENBrownGrade");
+
+RESULT(v[0]+v[1] )
+
+
+
+EQUATION("GreenFShare")
+/*
+Share of energy demanded to a a GreenF
+*/
+
+v[0]=V("ENGreenGrade");
+v[1]=V("SumENGrade");
+
+RESULT(v[0]/v[1] )
+
+
+
+EQUATION("BrownFShare")
+/*
+Share of energy demanded to a a BrownF
+*/
+
+v[0]=V("ENBrownGrade");
+v[1]=V("SumENGrade");
+
+RESULT(v[0]/v[1] )
+
+
+
+EQUATION("ControlEnergyShare")
+/*
+check if sum of shares is equal to one
+*/
+
+v[0]=SUM("GreenFShare");
+//INTERACT("GreenFShare", v[0]);
+v[1]=SUM("BrownFShare");
+//INTERACT("BrownFShare", v[1]);
+v[2]=v[0]+v[1];
+//INTERACT("v2", v[2]);
+
+//if(v[2] != 1 )
+if(v[2] > -10 && v[2] < 10 )
+	{
+	INTERACT("Sum of energy share != 1", v[2]);
+	}
+RESULT(v[2] )
+
+
+
+EQUATION("GreenFProd")
+/*
+Energy production of an individual GreenF
+*/
+
+v[0]=V("GreenFShare");
+v[1]=V("TotEnergyConsumption");
+
+RESULT(v[0]*v[1] )
+
+
+
+EQUATION("BrownFProd")
+/*
+Energy production of an individual GreenF
+*/
+
+v[0]=V("BrownFShare");
+v[1]=V("TotEnergyConsumption");
+
+RESULT(v[0]*v[1] )
+
+
+
+EQUATION("GreenEN")
+/*
+compute green energy produced
+*/
+
+v[0]=SUM("GreenFProd");
+
+RESULT(v[0] )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Temporarily deactivated //##################################################
+
+EQUATION("AvActualGreenEnergyCost")
+/*
+Weighted average of green energy cost
+*/
+//v[0]=V("Suma");
+//v[1]=V("GreenEN");
+//RESULT(v[0]/v[1] )
+RESULT(1 )
+
+EQUATION("Suma")
+/*
+Sum of "a" used to compute the weighted average of green energy AvActualGreenEnergyCost
+*/
+//v[0]=SUM("a");
+//RESULT(v[0] )
+RESULT(1 )
+
+EQUATION("CallMinGreenId") 
+/*
+greenId is a proxy for the location quality of green investment
+
+
+v[0]=0;
+//cur1=SEARCHS(root,"Energy");
+//if(cur1==NULL)
+//	INTERACT("cur NULL",v[0]);
+	
+cur1=p;
+v[4]=V("alphaFactor");
+v[5]=V("maxAlpha");
+CYCLE(cur,"GreenCapital")
+{
+  v[0]=VS(cur,"GreenId"); // current Id
+  v[1]=VS(cur,"GreenK");
+  if(v[1]==0) //check if the vintage has been scrapped
+  {
+  	//INTERACT("GreenK==0",v[1]);
+  	//sprintf(msg, "\n found 0 GreenK", v[0] ); plog(msg);
+    WRITE("MinGreenId",v[0]);
+    //INTERACT("check MinGreenId",v[0]);
+    //sprintf(msg, "\n New MinGreenId %g", v[0] ); plog(msg);
+
+    WRITES(cur1,"MinAlpha",v[5]*pow((1-v[4]),v[0]));
+    END_EQUATION(v[0])
+  }
+}
+
+v[2]=MAXS(cur1,"GreenId")+1;  
+//sprintf(msg, "\n MaxGreenId +1 %g", v[2] ); plog(msg);
+WRITES(cur1,"MinGreenId",v[2]);
+WRITES(cur1,"MinAlpha",v[5]*pow((1-v[4]),v[2]));
+//WRITES(cur,"alpha",v[5]-v[4]*v[2]);
+
+
+
+*/
+RESULT(1 )
+
+
+
+EQUATION("MaxENProduction") // Called by KCapital
+/*
+Compute the energy production of a new vintage for its whole lifespan
+
+
+
+V("CallMinGreenId");
+
+v[0]=V("GreenProductivity");
+cur1=SEARCHS(p->up->up->up,"Energy");
+v[2]=VS(cur1,"GreenCapitalDep"); // depreciation of green K 
+v[3]=VS(cur1,"MaxGreenKAge"); // life expectency of green capital
+
+v[4]=VS(cur1,"MinGreenId");
+v[5]=VS(cur1,"alphaFactor");
+v[6]=VS(cur1,"maxAlpha");
+
+v[7]=v[6]*pow(1-v[5],v[4]); // compute alpha
+
+v[8]=v[7]*v[0]*((1-v[2])-pow(1-v[2],v[3]+1) )/v[2];
+
+*/
+//RESULT(v[8] )
+RESULT(1 )
+
+
+
+EQUATION("GreenCapitalStock")
+/*
+Sum of GreenVintageStock
+
+v[0]=SUM("GreenVintageStock");
+*/
+//RESULT(v[0] )
+RESULT(1 )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 EQUATION("AvMaxEfficiency")
 /*
 */
 v[1]=AVE("MaxEfficiency");
 
 RESULT(v[1] )
-
-EQUATION("AvActualGreenEnergyCost")
-/*
-Weighted average of green energy cost
-*/
-v[0]=V("Suma");
-v[1]=V("GreenEN");
-RESULT(v[0]/v[1] )
-
-EQUATION("Suma")
-/*
-Sum of "a" used to compute the weighted average of green energy AvActualGreenEnergyCost
-*/
-v[0]=SUM("a");
-RESULT(v[0] )
 
 EQUATION("a")
 /*
@@ -117,6 +430,8 @@ v[3]=V("aaNW");
 
 v[4]=V("Vacancies");
 
+
+
 if(v[4]<1)
 	v[4]=1;
 
@@ -124,12 +439,17 @@ v[5]=v[3]*log(v[4]);
 if(v[5]>1)
 	v[5]=1;
 
-//v[6]=VL("aNW",1);
+if(v[5]<V("aNWmin") )
+ v[5]=V("aNWmin");
+if(v[5]>V("aNWmax"))
+ v[5]=V("aNWmax");
+
+v[6]=VL("aNW",1);
 //INTERACT("aNW 1", v[6]);
-//v[7]=0.1*v[5]+0.9*v[6];
+v[7]=V("aNWsmooth")*v[5]+(1-V("aNWsmooth"))*v[6];
 
 //RESULT(v[3]*log(v[2]+1) ) 
-RESULT(v[5] ) 
+RESULT(v[7] ) 
 
 
 
@@ -183,7 +503,7 @@ RESULT(v[0] )
 EQUATION("TotKLaborForce")
 /*
 */
-v[0]=SUM("LaborForce");
+v[0]=SUM("KLaborForce");
 
 RESULT(v[0] )
 
@@ -790,13 +1110,6 @@ if(v[5]==0)
 
 RESULT(v[5] )
 
-EQUATION("GreenCapitalStock")
-/*
-Sum of GreenVintageStock
-*/
-v[0]=SUM("GreenVintageStock");
-
-RESULT(v[0] )
 
 
 
@@ -1113,54 +1426,6 @@ if(v[5]==0)
 	v[5]=0.0001; // avoid division by zero
 
 RESULT(v[5] )
-
-
-
-EQUATION("GreenEN")
-/*
-compute green energy produced
-*/
-
-v[0]=SUM("GreenVintageEN");
-
-RESULT(v[0] )
-
-
-
-EQUATION("MaxENProduction") // Called by KCapital
-/*
-Compute the energy production of a new vintage for its whole lifespan
-*/
-
-
-V("CallMinGreenId");
-
-v[0]=V("GreenProductivity");
-cur1=SEARCHS(p->up->up->up,"Energy");
-v[2]=VS(cur1,"GreenCapitalDep"); // depreciation of green K 
-v[3]=VS(cur1,"MaxGreenKAge"); // life expectency of green capital
-
-v[4]=VS(cur1,"MinGreenId");
-v[5]=VS(cur1,"alphaFactor");
-v[6]=VS(cur1,"maxAlpha");
-
-v[7]=v[6]*pow(1-v[5],v[4]); // compute alpha
-
-v[8]=v[7]*v[0]*((1-v[2])-pow(1-v[2],v[3]+1) )/v[2];
-
-RESULT(v[8] )
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1987,43 +2252,7 @@ RESULT(v[6] )
 
 
 
-EQUATION("CallMinGreenId") 
-  /*
-   greenId is a proxy for the location quality of green investment
-   */
-v[0]=0;
-//cur1=SEARCHS(root,"Energy");
-//if(cur1==NULL)
-//	INTERACT("cur NULL",v[0]);
-	
-cur1=p;
-v[4]=V("alphaFactor");
-v[5]=V("maxAlpha");
-CYCLE(cur,"GreenCapital")
-{
-  v[0]=VS(cur,"GreenId"); // current Id
-  v[1]=VS(cur,"GreenK");
-  if(v[1]==0) //check if the vintage has been scrapped
-  {
-  	//INTERACT("GreenK==0",v[1]);
-  	//sprintf(msg, "\n found 0 GreenK", v[0] ); plog(msg);
-    WRITE("MinGreenId",v[0]);
-    //INTERACT("check MinGreenId",v[0]);
-    //sprintf(msg, "\n New MinGreenId %g", v[0] ); plog(msg);
 
-    WRITES(cur1,"MinAlpha",v[5]*pow((1-v[4]),v[0]));
-    END_EQUATION(v[0])
-  }
-}
-
-v[2]=MAXS(cur1,"GreenId")+1;  
-//sprintf(msg, "\n MaxGreenId +1 %g", v[2] ); plog(msg);
-WRITES(cur1,"MinGreenId",v[2]);
-WRITES(cur1,"MinAlpha",v[5]*pow((1-v[4]),v[2]));
-//WRITES(cur,"alpha",v[5]-v[4]*v[2]);
-
-
-RESULT(1 )
 
 
 
@@ -7145,6 +7374,8 @@ V("TauInit");
 V("ShareInit");
 
 v[40]=0;
+
+/*
 CYCLE(cur1,"Energy")
 	{
 	CYCLES(cur1,cur, "GreenCapital")
@@ -7154,7 +7385,7 @@ CYCLE(cur1,"Energy")
   	}
   WRITELLS(cur1, "GreenCapitalStock",v[40],t-1,t-1);
 	}
-
+*/
 
 RESULT( 1)
 
