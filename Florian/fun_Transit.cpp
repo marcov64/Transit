@@ -9,7 +9,6 @@ EQUATION("AvENPrice")
 /*
 Average production price of GreenF and BrownF (used to distribute demand)
 */
-
 v[0]=SUM("GreenENPrice");
 v[1]=SUM("BrownENPrice");
 v[2]=COUNT("GreenF");
@@ -61,7 +60,6 @@ EQUATION("NbrENFirms")
 /*
 Sum of GreenF and BrownF
 */
-
 v[0]=V("NbrGreenF");
 v[1]=V("NbrBrownF");
 
@@ -76,7 +74,7 @@ A grade that indicate relative position of energy producers regading price, ener
 v[0]=V("betaENPrice");
 v[1]=V("betaENType");
 v[2]=V("GreenENPrice");
-v[3]=V("AvGreenENPrice");
+v[3]=V("AvENPrice");
 v[4]=V("NbrENFirms");
 v[5]=v[2]/v[3]; // Normalize price
 v[6]=pow(v[5],v[0])*pow(1,v[1]); // 1 is for green energy (0.5 for brown)
@@ -92,10 +90,10 @@ A grade that indicate relative position of energy producers regading price, ener
 v[0]=V("betaENPrice");
 v[1]=V("betaENType");
 v[2]=V("BrownENPrice");
-v[3]=V("AvGreenENPrice");
+v[3]=V("AvENPricex");
 v[4]=V("NbrENFirms");
 v[5]=v[2]/v[3]; // Normalize price
-v[6]=pow(v[5],v[0])*pow(0.5,v[1]); // 0.5 is for brown energy 1( for green)
+v[6]=pow(v[5],v[0])*pow(0.5,v[1]); // 0.5 is for brown energy (1 for green)
 
 RESULT(v[6] )
 
@@ -105,7 +103,6 @@ EQUATION("SumENGrade")
 /*
 Sum of ENGreenGrade and ENBrownGrade
 */
-
 v[0]=SUM("ENGreenGrade");
 v[1]=SUM("ENBrownGrade");
 
@@ -117,7 +114,6 @@ EQUATION("GreenFShare")
 /*
 Share of energy demanded to a a GreenF
 */
-
 v[0]=V("ENGreenGrade");
 v[1]=V("SumENGrade");
 
@@ -129,7 +125,6 @@ EQUATION("BrownFShare")
 /*
 Share of energy demanded to a a BrownF
 */
-
 v[0]=V("ENBrownGrade");
 v[1]=V("SumENGrade");
 
@@ -141,7 +136,6 @@ EQUATION("ControlEnergyShare")
 /*
 check if sum of shares is equal to one
 */
-
 v[0]=SUM("GreenFShare");
 //INTERACT("GreenFShare", v[0]);
 v[1]=SUM("BrownFShare");
@@ -149,9 +143,9 @@ v[1]=SUM("BrownFShare");
 v[2]=v[0]+v[1];
 //INTERACT("v2", v[2]);
 
-//if(v[2] != 1 )
-if(v[2] > -10 && v[2] < 10 )
+if( abs(v[2]-1)>0.00001)
 	{
+	LOG("\n%lf", v[2]);
 	INTERACT("Sum of energy share != 1", v[2]);
 	}
 RESULT(v[2] )
@@ -162,7 +156,6 @@ EQUATION("GreenFProd")
 /*
 Energy production of an individual GreenF
 */
-
 v[0]=V("GreenFShare");
 v[1]=V("TotEnergyConsumption");
 
@@ -174,7 +167,6 @@ EQUATION("BrownFProd")
 /*
 Energy production of an individual GreenF
 */
-
 v[0]=V("BrownFShare");
 v[1]=V("TotEnergyConsumption");
 
@@ -186,7 +178,6 @@ EQUATION("GreenEN")
 /*
 compute green energy produced
 */
-
 v[0]=SUM("GreenFProd");
 
 RESULT(v[0] )
