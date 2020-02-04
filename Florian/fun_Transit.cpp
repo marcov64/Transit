@@ -90,7 +90,7 @@ A grade that indicate relative position of energy producers regading price, ener
 v[0]=V("betaENPrice");
 v[1]=V("betaENType");
 v[2]=V("BrownENPrice");
-v[3]=V("AvENPricex");
+v[3]=V("AvENPrice");
 v[4]=V("NbrENFirms");
 v[5]=v[2]/v[3]; // Normalize price
 v[6]=pow(v[5],v[0])*pow(0.5,v[1]); // 0.5 is for brown energy (1 for green)
@@ -297,6 +297,103 @@ v[0]=SUM("GreenVintageStock");
 RESULT(1 )
 
 
+
+
+EQUATION("PlaceGreenOrder") // Called by energy
+/*
+
+if(V("GreenInvestment")<0.1)
+  END_EQUATION(1); // stop
+
+v[1]=V("AvGreenEnergyCostSpe");
+v[2]=V("OilPrice");
+v[3]=V("OilProd");
+v[4]=v[2]/v[3]; // Unit cost to produce dirty energy
+
+v[5]=V("GreenInvestment"); 
+
+cur2 = SEARCHS( p->up, "Energy" );
+WRITES(cur2, "LocalGreenInvestmentOrder",0);
+
+
+//sprintf(msg, "\n PlaceGreenOrder"); plog(msg); 
+
+
+// local cost < RoW cost 
+  //  sprintf(msg, "\n local %g < RoW %g ", v[1], v[0] ); plog(msg);
+  
+  if(v[1]<v[4] ) // 2. Check if green cheaper than dirty
+  { // if green cheaper than dirty, buy from local 
+    
+    //sprintf(msg, "\n local green %g cheaper than dirty %g", v[1], v[4] );	plog(msg);
+    
+    v[31]=V("GreenInvestment");
+    //sprintf(msg, "\n PlaceGreeeOrder GreenInvestment %g ", v[31] ); plog(msg);
+    // GreenGrade is computed in its own equation now
+    cur3=SEARCHS(p->up,"Machinery");
+    v[71]=SUMS(cur3,"GreenGrade"); 
+    
+    CYCLE(cur1,"KFirm")
+    {
+      v[75]=VS(cur1,"GreenGrade");
+      v[72]=v[75]/v[71]; // Share of GreenInvestment
+      v[73]=v[72]*v[31]; // GreenKamount
+      WRITES(cur1,"GreenKAmount",v[73]);
+      
+      // Now, we know the amount of greenK bought to each KFirm, we can place orders
+
+      if(v[73]>0)
+      {
+        if(VS(cur1, "NumOrders")==0)
+          cur2 = SEARCHS(cur1, "Order");
+        else  
+          cur2=ADDOBJS(cur1,"Order"); // add a new instance of Order to KFirm
+        
+        if(cur2==NULL)
+          INTERACT("cur2 NULL",v[73]);
+        
+        v[1]=VLS(cur1,"KPrice",1);
+        WRITES(cur2,"GreenOrder",1);
+        //WRITES(cur2,"KAmount",v[73]);
+        
+        WRITES(cur2,"KAmount",v[73]);
+        //sprintf(msg, "\n PlaceGreeeOrder KAmount %g ", v[73] ); plog(msg);
+        
+        
+        WRITES(cur2,"KCompletion",0);
+        WRITES(cur2,"TimeWaited",1);
+        INCRS(cur1,"NumOrders",1); //cur1 = KFirm
+        
+        //v[2]=VLS(cur,"GreenProductivity",1); //current state of the K art
+        cur=SEARCHS(cur1,"KCapital");
+        v[2]=VLS(cur,"GreenProductivity",1); //current state of the K art
+        
+        WRITES(cur2,"GreenKProd",v[2]); //tech characteristics of the capital stock order
+        WRITES(cur2,"KP",v[1]);// write the price of the capital in the period in which it is ordered, and use it to compute the actual expenditure using the `agreed' price.
+        v[3]=VS(c,"IdEnergy");
+        V("CallMinGreenId");
+        
+        v[24]=V("MinGreenId");
+        //sprintf(msg, "\n minGreenId %g", v[24] ); plog(msg);
+        WRITES(cur2,"OrderGreenId",v[24]);
+        v[25]=V("MinAlpha");
+        WRITES(cur2,"OrderAlpha",v[25]);
+        WRITES(cur2,"IdClient",v[3]);
+        
+        cur2->hook=c; //useful to retrieve quickly the energy object
+      }
+    }
+  }
+  else
+  {
+    //sprintf(msg, "\n local green %g more expansive than dirty %g", v[1], v[4] ); plog(msg);
+    END_EQUATION(1); // stop   	
+  }
+  
+
+ */
+RESULT(1 )
+  
 
 
 
@@ -1655,101 +1752,6 @@ RESULT(v[4] )
 
 
 
-EQUATION("PlaceGreenOrder") // Called by energy
-/*
- */
-if(V("GreenInvestment")<0.1)
-  END_EQUATION(1); // stop
-
-v[1]=V("AvGreenEnergyCostSpe");
-v[2]=V("OilPrice");
-v[3]=V("OilProd");
-v[4]=v[2]/v[3]; // Unit cost to produce dirty energy
-
-v[5]=V("GreenInvestment"); 
-
-cur2 = SEARCHS( p->up, "Energy" );
-WRITES(cur2, "LocalGreenInvestmentOrder",0);
-
-
-//sprintf(msg, "\n PlaceGreenOrder"); plog(msg); 
-
-
-// local cost < RoW cost 
-  //  sprintf(msg, "\n local %g < RoW %g ", v[1], v[0] ); plog(msg);
-  
-  if(v[1]<v[4] ) // 2. Check if green cheaper than dirty
-  { // if green cheaper than dirty, buy from local 
-    
-    //sprintf(msg, "\n local green %g cheaper than dirty %g", v[1], v[4] );	plog(msg);
-    
-    v[31]=V("GreenInvestment");
-    //sprintf(msg, "\n PlaceGreeeOrder GreenInvestment %g ", v[31] ); plog(msg);
-    // GreenGrade is computed in its own equation now
-    cur3=SEARCHS(p->up,"Machinery");
-    v[71]=SUMS(cur3,"GreenGrade"); 
-    
-    CYCLE(cur1,"KFirm")
-    {
-      v[75]=VS(cur1,"GreenGrade");
-      v[72]=v[75]/v[71]; // Share of GreenInvestment
-      v[73]=v[72]*v[31]; // GreenKamount
-      WRITES(cur1,"GreenKAmount",v[73]);
-      
-      // Now, we know the amount of greenK bought to each KFirm, we can place orders
-
-      if(v[73]>0)
-      {
-        if(VS(cur1, "NumOrders")==0)
-          cur2 = SEARCHS(cur1, "Order");
-        else  
-          cur2=ADDOBJS(cur1,"Order"); // add a new instance of Order to KFirm
-        
-        if(cur2==NULL)
-          INTERACT("cur2 NULL",v[73]);
-        
-        v[1]=VLS(cur1,"KPrice",1);
-        WRITES(cur2,"GreenOrder",1);
-        //WRITES(cur2,"KAmount",v[73]);
-        
-        WRITES(cur2,"KAmount",v[73]);
-        //sprintf(msg, "\n PlaceGreeeOrder KAmount %g ", v[73] ); plog(msg);
-        
-        
-        WRITES(cur2,"KCompletion",0);
-        WRITES(cur2,"TimeWaited",1);
-        INCRS(cur1,"NumOrders",1); //cur1 = KFirm
-        
-        //v[2]=VLS(cur,"GreenProductivity",1); //current state of the K art
-        cur=SEARCHS(cur1,"KCapital");
-        v[2]=VLS(cur,"GreenProductivity",1); //current state of the K art
-        
-        WRITES(cur2,"GreenKProd",v[2]); //tech characteristics of the capital stock order
-        WRITES(cur2,"KP",v[1]);// write the price of the capital in the period in which it is ordered, and use it to compute the actual expenditure using the `agreed' price.
-        v[3]=VS(c,"IdEnergy");
-        V("CallMinGreenId");
-        
-        v[24]=V("MinGreenId");
-        //sprintf(msg, "\n minGreenId %g", v[24] ); plog(msg);
-        WRITES(cur2,"OrderGreenId",v[24]);
-        v[25]=V("MinAlpha");
-        WRITES(cur2,"OrderAlpha",v[25]);
-        WRITES(cur2,"IdClient",v[3]);
-        
-        cur2->hook=c; //useful to retrieve quickly the energy object
-      }
-    }
-  }
-  else
-  {
-    //sprintf(msg, "\n local green %g more expansive than dirty %g", v[1], v[4] ); plog(msg);
-    END_EQUATION(1); // stop   	
-  }
-  
-
-
-RESULT(1 )
-  
   
   
     
