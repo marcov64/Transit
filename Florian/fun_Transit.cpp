@@ -185,6 +185,239 @@ RESULT(v[0] )
 
 
 
+EQUATION("GreenKProductionFlow")
+/*
+ 
+*/
+//Activity of the K producing firm
+v[0]=V("GreenKQ"); //production capacity of the firm
+v[1]=V("GreenNumOrders");
+if(v[1]==0)
+  END_EQUATION(0);
+v[2]=v[0]/v[1]; //one way to determine the amount of K production capacity per order. Otherwise...
+
+v[3]=0;
+CYCLE(cur, "GreenOrder")
+{
+  v[4]=VS(cur,"GreenKAmount");
+  v[5]=VS(cur,"GreenKCompletion");
+  v[3]+=v[4]-v[5];
+}
+cur5=SEARCH("BankGreenK");
+WRITES(cur5,"GreenKRevenues",0);
+
+CYCLE_SAFE(cur, "GreenOrder")
+{//increase the level of advancement of the orders and, if completed, remove the order. Given the production capacity, devote it respecting oreders' order (first comes first go, which allows to respect the priority given by customers, on side, and to reduce the dofferences between the price agreed upon ordering and the price at which the kapital is sold)
+  v[4]=VS(cur,"GreenKAmount");
+  v[5]=VS(cur,"GreenKCompletion");
+  v[6]=(v[4]-v[5]); // given the missing quantity of the current order
+  //v[7]=v[6]*v[0]; //share of production capacity devoted to this order
+  v[8]=min(v[0], v[4]-v[5]); //use the production capacity needed actually neded to produce the order, or exhaust here the production capacity (for the current period)
+  INCRS(cur,"GreenKCompletion",v[8]);
+  v[0]=v[0]-v[8];
+  v[5]=VS(cur,"GreenKCompletion"); //update the completion level  in order to cancel the order if done
+  if(v[5]>=v[4])
+  {//order fulfilled. Either search for the ordering firm, or simply use the hook
+    if(v[5]>0)
+    {//stupid control needed to not be confused by the very initial object
+        if(cur->hook==NULL)
+          INTERACT("hook NULL",v[0]);
+        //        INCRS(cur->hook,"NumK",1); // hook should be the ordering firm
+        //cur1=ADDOBJS(cur->hook,"Capital");
+        //      cur1=cur->hook->add_an_object("Capital");
+        //        if(t>7)
+        //      INTERACTS(cur->hook, "PincoPallo", v[5]);
+        cur1=ADDOBJS(cur->hook,"GreenCapital");
+        WRITELS(cur1,"K",v[5],t);
+        v[9]=VS(cur,"GreenKproductivity");
+        WRITELS(cur1,"GreenIncProductivity",v[9],t);
+        
+        // Incorporate KEfficiency in the vintage produced IncEfficiency
+//        v[90]=VS(cur,"KEfficiency");
+//        WRITELS(cur1,"IncEfficiency",v[90],t);
+        
+        //      v[10]=VS(cur,"KSkillBiais");
+        //      WRITELS(cur1,"IncSkillBiais",v[10],t);
+        WRITELS(cur1,"GreenIncLearningK",0.1,t);
+        WRITELS(cur1,"GreenKAge",0,t);
+        v[11]=VS(cur,"GreenKP");
+        v[12]=v[11]*v[5];
+        WRITELS(cur1,"GreenKExpenditures",v[12], t);
+        WRITES(cur->hook,"GreenWaiting",0); //tell the firms it has the new capital
+        SORTS(cur->hook,"GreeenCapital","GreenIncProductivity", "DOWN");
+        cur5=SEARCHS(cur->hook,"BankGreenF");
+        INCRS(cur5,"DebtGreenF",v[4]*v[11]); //sprintf(msg, " KF(%g)\n", v[4]*v[11]); plog(msg);  
+        INCRS(cur5->hook,"GreenCapitalDemand",v[4]*v[11]);
+        cur5=SEARCH("BankGreenK");
+        INCRS(cur5,"GreenKRevenues",v[4]*v[11]);
+        
+        //      WRITES(cur1,"ResellPrice",v[11]*V("DiscountUsedK"));
+        
+        v[20]=INCR("NumGreenOrders",-1);
+        if(v[20]>0)
+          DELETE(cur);
+        else
+        {
+          WRITES(cur,"GreenKAmount",0);
+          WRITES(cur,"GreenKCompletion",0);
+          WRITES(cur,"GreenTimeWaited",0);
+          WRITES(cur,"GreenKproductivity",0);
+//          WRITES(cur,"KEfficiency",0);
+          WRITES(cur, "GreenIdClient", -1);
+          cur->hook=NULL; 
+        }
+    }
+  }
+  else
+  {
+    if(v[4]>0)
+      INCRS(cur,"GreenTimeWaited",1); // if orders remain non completed increase the time needed to go through future orders
+  }
+  
+}
+
+v[13]=min(V("GreenKQ"),v[3]);
+v[15]=V("GreenKQ")-v[3];
+v[16]=v[15]-v[0];
+//if(v[15]>0 && v[15]!=v[0])
+//INTERACT("check the correspondence between production and KQ",v[16]);
+//if(v[15]<0 && v[0]!=0)
+//INTERACT("check the correspondence between production and KQ",v[0]);
+
+RESULT(v[13] )
+
+
+
+
+EQUATION("BrownKProductionFlow")
+/*
+ 
+*/
+//Activity of the K producing firm
+v[0]=V("BrownKQ"); //production capacity of the firm
+v[1]=V("BrownNumOrders");
+if(v[1]==0)
+  END_EQUATION(0);
+v[2]=v[0]/v[1]; //one way to determine the amount of K production capacity per order. Otherwise...
+
+v[3]=0;
+CYCLE(cur, "BrownOrder")
+{
+  v[4]=VS(cur,"BrownKAmount");
+  v[5]=VS(cur,"BrownKCompletion");
+  v[3]+=v[4]-v[5];
+}
+cur5=SEARCH("BankBrownK");
+WRITES(cur5,"BrownKRevenues",0);
+
+CYCLE_SAFE(cur, "BrownOrder")
+{//increase the level of advancement of the orders and, if completed, remove the order. Given the production capacity, devote it respecting oreders' order (first comes first go, which allows to respect the priority given by customers, on side, and to reduce the dofferences between the price agreed upon ordering and the price at which the kapital is sold)
+  v[4]=VS(cur,"BrownKAmount");
+  v[5]=VS(cur,"BrownKCompletion");
+  v[6]=(v[4]-v[5]); // given the missing quantity of the current order
+  //v[7]=v[6]*v[0]; //share of production capacity devoted to this order
+  v[8]=min(v[0], v[4]-v[5]); //use the production capacity needed actually neded to produce the order, or exhaust here the production capacity (for the current period)
+  INCRS(cur,"BrownKCompletion",v[8]);
+  v[0]=v[0]-v[8];
+  v[5]=VS(cur,"BrownKCompletion"); //update the completion level  in order to cancel the order if done
+  if(v[5]>=v[4])
+  {//order fulfilled. Either search for the ordering firm, or simply use the hook
+    if(v[5]>0)
+    {//stupid control needed to not be confused by the very initial object
+        if(cur->hook==NULL)
+          INTERACT("hook NULL",v[0]);
+        //        INCRS(cur->hook,"NumK",1); // hook should be the ordering firm
+        //cur1=ADDOBJS(cur->hook,"Capital");
+        //      cur1=cur->hook->add_an_object("Capital");
+        //        if(t>7)
+        //      INTERACTS(cur->hook, "PincoPallo", v[5]);
+        cur1=ADDOBJS(cur->hook,"BrownCapital");
+        WRITELS(cur1,"K",v[5],t);
+        v[9]=VS(cur,"BrownKproductivity");
+        WRITELS(cur1,"BrownIncProductivity",v[9],t);
+        
+        // Incorporate KEfficiency in the vintage produced IncEfficiency
+//        v[90]=VS(cur,"KEfficiency");
+//        WRITELS(cur1,"IncEfficiency",v[90],t);
+        
+        //      v[10]=VS(cur,"KSkillBiais");
+        //      WRITELS(cur1,"IncSkillBiais",v[10],t);
+        WRITELS(cur1,"BrownIncLearningK",0.1,t);
+        WRITELS(cur1,"BrownKAge",0,t);
+        v[11]=VS(cur,"BrownKP");
+        v[12]=v[11]*v[5];
+        WRITELS(cur1,"BrownKExpenditures",v[12], t);
+        WRITES(cur->hook,"BrownWaiting",0); //tell the firms it has the new capital
+        SORTS(cur->hook,"GreeenCapital","BrownIncProductivity", "DOWN");
+        cur5=SEARCHS(cur->hook,"BankBrownF");
+        INCRS(cur5,"DebtBrownF",v[4]*v[11]); //sprintf(msg, " KF(%g)\n", v[4]*v[11]); plog(msg);  
+        INCRS(cur5->hook,"BrownCapitalDemand",v[4]*v[11]);
+        cur5=SEARCH("BankBrownK");
+        INCRS(cur5,"BrownKRevenues",v[4]*v[11]);
+        
+        //      WRITES(cur1,"ResellPrice",v[11]*V("DiscountUsedK"));
+        
+        v[20]=INCR("NumBrownOrders",-1);
+        if(v[20]>0)
+          DELETE(cur);
+        else
+        {
+          WRITES(cur,"BrownKAmount",0);
+          WRITES(cur,"BrownKCompletion",0);
+          WRITES(cur,"BrownTimeWaited",0);
+          WRITES(cur,"BrownKproductivity",0);
+//          WRITES(cur,"KEfficiency",0);
+          WRITES(cur, "BrownIdClient", -1);
+          cur->hook=NULL; 
+        }
+    }
+  }
+  else
+  {
+    if(v[4]>0)
+      INCRS(cur,"BrownTimeWaited",1); // if orders remain non completed increase the time needed to go through future orders
+  }
+  
+}
+
+v[13]=min(V("BrownKQ"),v[3]);
+v[15]=V("BrownKQ")-v[3];
+v[16]=v[15]-v[0];
+//if(v[15]>0 && v[15]!=v[0])
+//INTERACT("check the correspondence between production and KQ",v[16]);
+//if(v[15]<0 && v[0]!=0)
+//INTERACT("check the correspondence between production and KQ",v[0]);
+
+RESULT(v[13] )
+  
+  
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

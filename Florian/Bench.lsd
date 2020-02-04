@@ -602,6 +602,26 @@ Label Root
 
 			}
 
+			Son: EnergyMachinery
+			Label EnergyMachinery
+			{
+				Son: GreenKF
+				Label GreenKF
+				{
+					Var: GreenKProductionFlow
+
+				}
+
+				Son: BrownKF
+				Label BrownKF
+				{
+					Var: BrownKProductionFlow
+
+				}
+
+
+			}
+
 			Var: AggProductivity
 			Var: AllocateBlRecouped
 			Var: Andre
@@ -1410,6 +1430,14 @@ Var: BrownFProd 0 s + n n
 
 Object: BrownCapital C	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1
 Param: BrownK 0 n + n n	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000	1000000000
+
+Object: EnergyMachinery C	1
+
+Object: GreenKF C	10
+Var: GreenKProductionFlow 0 n + n n
+
+Object: BrownKF C	10
+Var: BrownKProductionFlow 0 n + n n
 
 SIM_NUM 1
 SEED 1
@@ -5098,6 +5126,34 @@ Parameter_BrownK
 (no description available)
 _INIT_
 All 50 instances equal to 1000000000.
+END_DESCRIPTION
+
+Object_EnergyMachinery
+Sector producing capital goods (green and brown) for the energy sector
+_INIT_
+
+END_DESCRIPTION
+
+Object_GreenKF
+Firms producing green capital goods
+_INIT_
+
+END_DESCRIPTION
+
+Variable_GreenKProductionFlow
+Production of GreenKF
+
+END_DESCRIPTION
+
+Object_BrownKF
+Firms producing brown capital goods
+_INIT_
+
+END_DESCRIPTION
+
+Variable_BrownKProductionFlow
+Production of brown capital
+
 END_DESCRIPTION
 
 
