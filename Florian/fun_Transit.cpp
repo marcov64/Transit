@@ -418,6 +418,153 @@ RESULT(1 )
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EQUATION("KProductionFlow")
+/*
+ 
+ */
+//Activity of the K producing firm
+v[0]=V("KQ"); //production capacity of the firm
+v[1]=V("NumOrders");
+if(v[1]==0)
+  END_EQUATION(0);
+v[2]=v[0]/v[1]; //one way to determine the amount of K production capacity per order. Otherwise...
+
+v[3]=0;
+CYCLE(cur, "Order")
+{
+  v[4]=VS(cur,"KAmount");
+  v[5]=VS(cur,"KCompletion");
+  v[3]+=v[4]-v[5];
+}
+cur5=SEARCH("BankK");
+WRITES(cur5,"KRevenues",0);
+
+CYCLE_SAFE(cur, "Order")
+{//increase the level of advancement of the orders and, if completed, remove the order. Given the production capacity, devote it respecting oreders' order (first comes first go, which allows to respect the priority given by customers, on side, and to reduce the dofferences between the price agreed upon ordering and the price at which the kapital is sold)
+  v[4]=VS(cur,"KAmount");
+  v[5]=VS(cur,"KCompletion");
+  v[6]=(v[4]-v[5]); // given the missing quantity of the current order
+  //v[7]=v[6]*v[0]; //share of production capacity devoted to this order
+  v[8]=min(v[0], v[4]-v[5]); //use the production capacity needed actually neded to produce the order, or exhaust here the production capacity (for the current period)
+  INCRS(cur,"KCompletion",v[8]);
+  v[0]=v[0]-v[8];
+  v[5]=VS(cur,"KCompletion"); //update the completion level  in order to cancel the order if done
+  if(v[5]>=v[4])
+  {//order fulfilled. Either search for the ordering firm, or simply use the hook
+    if(v[5]>0)
+    {//stupid control needed to not be confused by the very initial object
+        if(cur->hook==NULL)
+          INTERACT("hook NULL",v[0]);
+        //        INCRS(cur->hook,"NumK",1); // hook should be the ordering firm
+        //cur1=ADDOBJS(cur->hook,"Capital");
+        //      cur1=cur->hook->add_an_object("Capital");
+        //        if(t>7)
+        //      INTERACTS(cur->hook, "PincoPallo", v[5]);
+        cur1=ADDOBJS(cur->hook,"Capital");
+        WRITELS(cur1,"K",v[5],t);
+        v[9]=VS(cur,"Kproductivity");
+        WRITELS(cur1,"IncProductivity",v[9],t);
+        
+        // Incorporate KEfficiency in the vintage produced IncEfficiency
+        v[90]=VS(cur,"KEfficiency");
+        WRITELS(cur1,"IncEfficiency",v[90],t);
+        
+        //      v[10]=VS(cur,"KSkillBiais");
+        //      WRITELS(cur1,"IncSkillBiais",v[10],t);
+        WRITELS(cur1,"IncLearningK",0.1,t);
+        WRITELS(cur1,"KAge",0,t);
+        v[11]=VS(cur,"KP");
+        v[12]=v[11]*v[5];
+        WRITELS(cur1,"KExpenditures",v[12], t);
+        WRITES(cur->hook,"Waiting",0); //tell the firms it has the new capital
+        SORTS(cur->hook,"Capital","IncProductivity", "DOWN");
+        cur5=SEARCHS(cur->hook,"BankF");
+        INCRS(cur5,"DebtF",v[4]*v[11]); //sprintf(msg, " KF(%g)\n", v[4]*v[11]); plog(msg);  
+        INCRS(cur5->hook,"CapitalDemand",v[4]*v[11]);
+        cur5=SEARCH("BankK");
+        INCRS(cur5,"KRevenues",v[4]*v[11]);
+        
+        //      WRITES(cur1,"ResellPrice",v[11]*V("DiscountUsedK"));
+        
+        v[20]=INCR("NumOrders",-1);
+        if(v[20]>0)
+          DELETE(cur);
+        else
+        {
+          WRITES(cur,"KAmount",0);
+          WRITES(cur,"KCompletion",0);
+          WRITES(cur,"TimeWaited",0);
+          WRITES(cur,"Kproductivity",0);
+          WRITES(cur,"KEfficiency",0);
+          WRITES(cur, "IdClient", -1);
+          cur->hook=NULL; 
+        }
+    }
+  }
+  else
+  {
+    if(v[4]>0)
+      INCRS(cur,"TimeWaited",1); // if orders remain non completed increase the time needed to go through future orders
+  }
+  
+}
+
+v[13]=min(V("KQ"),v[3]);
+v[15]=V("KQ")-v[3];
+v[16]=v[15]-v[0];
+//if(v[15]>0 && v[15]!=v[0])
+//INTERACT("check the correspondence between production and KQ",v[16]);
+//if(v[15]<0 && v[0]!=0)
+//INTERACT("check the correspondence between production and KQ",v[0]);
+
+RESULT(v[13] )
+  
+  
+
+
+
+
+
+
+
+
+
+
+
+
 EQUATION("AvMaxEfficiency")
 /*
 */
@@ -1947,218 +2094,6 @@ v[82]=v[52]/v[90]; // Av WaitTime
 
 
 
-EQUATION("KProductionFlow")
-/*
- 
- */
-
-cur6=SEARCHS(p->up->up,"Energy"); 
-if(cur6==NULL)
-  INTERACT("cur6 NULL",1);
-//WRITES(cur6,"LocalGreenInvestment",0);
-
-//Activity of the K producing firm
-v[0]=V("KQ"); //production capacity of the firm
-v[1]=V("NumOrders");
-if(v[1]==0)
-  END_EQUATION(0);
-v[2]=v[0]/v[1]; //one way to determine the amount of K production capacity per order. Otherwise...
-
-v[3]=0;
-CYCLE(cur, "Order")
-{
-  v[4]=VS(cur,"KAmount");
-  v[5]=VS(cur,"KCompletion");
-  v[3]+=v[4]-v[5];
-}
-cur5=SEARCH("BankK");
-WRITES(cur5,"KRevenues",0);
-
-CYCLE_SAFE(cur, "Order")
-{//increase the level of advancement of the orders and, if completed, remove the order. Given the production capacity, devote it respecting oreders' order (first comes first go, which allows to respect the priority given by customers, on side, and to reduce the dofferences between the price agreed upon ordering and the price at which the kapital is sold)
-  v[4]=VS(cur,"KAmount");
-  v[5]=VS(cur,"KCompletion");
-  v[6]=(v[4]-v[5]); // given the missing quantity of the current order
-  //v[7]=v[6]*v[0]; //share of production capacity devoted to this order
-  v[8]=min(v[0], v[4]-v[5]); //use the production capacity needed actually neded to produce the order, or exhaust here the production capacity (for the current period)
-  INCRS(cur,"KCompletion",v[8]);
-  v[0]=v[0]-v[8];
-  v[5]=VS(cur,"KCompletion"); //update the completion level  in order to cancel the order if done
-  if(v[5]>=v[4])
-  {//order fulfilled. Either search for the ordering firm, or simply use the hook
-    if(v[5]>0)
-    {//stupid control needed to not be confused by the very initial object
-      if(VS(cur,"GreenOrder")==1)
-      {// Order is a GreenOrder
-        
-        V("CallMinGreenId");
-        // Check is minGreenId < MAX(GreenId) to know if there is an available location
-        v[30]=VS(cur,"MinGreenId");
-        //sprintf(msg, "\n MinGreenId %g", v[30]); plog(msg);  
-        v[31]=MAX("GreenId");
-        //sprintf(msg, "\n MAX GreenId %g", v[31]); plog(msg);  
-        v[32]=VS(cur,"MinAlpha");
-        
-        if(v[30]<v[31])
-        {// if there is a free GreenId (GreenK=0), place here the new green vintage
-          cur1=SEARCH_CND("GreenId", v[30]);
-          //sprintf(msg, "there is a free GreenId (GreenK=0)", v[31]); plog(msg);
-        }
-        else
-        {// if there is no free GreenId (GreenK != 0), create a new Id
-          cur1=ADDOBJS(cur->hook,"GreenCapital");
-          //sprintf(msg, "there is no free GreenId (GreenK != 0)", v[31]); plog(msg);
-          WRITES(cur1,"GreenId",v[30]+1);
-        }
-        WRITES(cur1,"alpha",v[32]);
-        WRITELS(cur1,"GreenK",v[5],t);
-        v[9]=VS(cur,"GreenKProd");
-        WRITELS(cur1,"GreenIncProductivity",v[9],t);
-        
-        WRITELS(cur1,"GreenKAge",0,t);
-        v[11]=VS(cur,"KP");
-        WRITELS(cur1,"GreenKPrice",v[11], t);
-        v[12]=v[11]*v[5];
-        WRITELS(cur1,"GreenKExpenditures",v[12], t);
-        
-        
-        v[50]=min(v[0],v[3]);
-        
-         //sprintf(msg, "\n KQ %lf", v[0] ); plog(msg);
-         //sprintf(msg, "\n v3 %lf", v[3] ); plog(msg);
-				
-				
-        WRITES(cur->up,"LocalGreenInvestment",v[50]);
-        //INCRS(cur6,"TotLocalGreenInvestment",v[50]);
-        
-         //sprintf(msg, "\n LocalGreenInvestment %lf", v[50] ); plog(msg);
-
-        
-        //			cur2=SEARCHS(p->up->up,"Energy");
-        //sprintf(msg, "\n GreenId %lf", v[30] ); plog(msg);
-        
-        
-        v[14]=V("GreenCapitalDep");
-        v[15]=V("MaxGreenKAge");
-        
-        //v[13]=((v[32]*v[9]*((1-v[14])-pow(1-v[14],v[15]+1) )/v[14]))/v[11]; // Computes ActualGreenEnergyCost
-        v[13]=v[11]/(v[32]*v[9]*((1-v[14])-pow(1-v[14],v[15]+1) )/v[14]); // Computes ActualGreenEnergyCost
-        
-        
-        //INTERACT("GreenEnergyCost",v[13]);
-//sprintf(msg, "\n GreenEnergyCostKProductionFlow %lf", v[13] ); plog(msg);
-        WRITELS(cur1,"ActualGreenEnergyCost",v[13],t);
-        
-        
-        WRITES(cur->hook,"EWaiting",0); //tell the firms it has the new capital
-        cur5=SEARCHS(cur->hook,"BankE");
-        INCRS(cur5,"BalanceE",-v[4]*v[11]); //sprintf(msg, " KF(%g)\n", v[4]*v[11]); plog(msg);  
-        cur4=SEARCH("BankK");
-        INCRS(cur4,"KRevenues",v[4]*v[11]);
-        
-        cur3=SEARCHS(p->up->up, "Bank");
-        if(cur3==NULL)
-          INTERACT("MERDE CUR3", v[15]);
-        INCRS(cur3,"CapitalDemand",v[4]*v[11]);
-        
-        ////      WRITES(cur1,"ResellPrice",v[11]*V("DiscountUsedK"));
-        
-        v[20]=INCR("NumOrders",-1);
-        //if(v[20]<=0)
-        //INTERACTS(cur, "Ponco", v[20]);
-        if(v[20]>0)
-          DELETE(cur);
-        else
-        {
-          WRITES(cur,"KAmount",0);
-          WRITES(cur,"KCompletion",0);
-          WRITES(cur,"TimeWaited",0);
-          WRITES(cur,"Kproductivity",0);
-          WRITES(cur,"KEfficiency",0); 
-          WRITES(cur, "IdClient", -1);
-          cur->hook=NULL;
-          
-        }
-      }
-      else
-      {// Order is not a GreenOrder
-        
-        if(cur->hook==NULL)
-          INTERACT("hook NULL",v[0]);
-        
-        //INTERACT("stop",v[0]);
-        
-        
-        //        INCRS(cur->hook,"NumK",1); // hook should be the ordering firm
-        //cur1=ADDOBJS(cur->hook,"Capital");
-        //      cur1=cur->hook->add_an_object("Capital");
-        //        if(t>7)
-        //      INTERACTS(cur->hook, "PincoPallo", v[5]);
-        cur1=ADDOBJS(cur->hook,"Capital");
-        WRITELS(cur1,"K",v[5],t);
-        v[9]=VS(cur,"Kproductivity");
-        WRITELS(cur1,"IncProductivity",v[9],t);
-        
-        // Incorporate KEfficiency in the vintage produced IncEfficiency
-        v[90]=VS(cur,"KEfficiency");
-        WRITELS(cur1,"IncEfficiency",v[90],t);
-        
-        //      v[10]=VS(cur,"KSkillBiais");
-        //      WRITELS(cur1,"IncSkillBiais",v[10],t);
-        WRITELS(cur1,"IncLearningK",0.1,t);
-        WRITELS(cur1,"KAge",0,t);
-        v[11]=VS(cur,"KP");
-        v[12]=v[11]*v[5];
-        WRITELS(cur1,"KExpenditures",v[12], t);
-        WRITES(cur->hook,"Waiting",0); //tell the firms it has the new capital
-        SORTS(cur->hook,"Capital","IncProductivity", "DOWN");
-        cur5=SEARCHS(cur->hook,"BankF");
-        INCRS(cur5,"DebtF",v[4]*v[11]); //sprintf(msg, " KF(%g)\n", v[4]*v[11]); plog(msg);  
-        INCRS(cur5->hook,"CapitalDemand",v[4]*v[11]);
-        cur5=SEARCH("BankK");
-        INCRS(cur5,"KRevenues",v[4]*v[11]);
-        
-        //      WRITES(cur1,"ResellPrice",v[11]*V("DiscountUsedK"));
-        
-        v[20]=INCR("NumOrders",-1);
-        if(v[20]>0)
-          DELETE(cur);
-        else
-        {
-          WRITES(cur,"KAmount",0);
-          WRITES(cur,"KCompletion",0);
-          WRITES(cur,"TimeWaited",0);
-          WRITES(cur,"Kproductivity",0);
-          WRITES(cur,"KEfficiency",0);
-          WRITES(cur, "IdClient", -1);
-          cur->hook=NULL;
-          
-        }
-      }
-    }
-  }
-  else
-  {
-    if(v[4]>0)
-      INCRS(cur,"TimeWaited",1); // if orders remain non completed increase the time needed to go through future orders
-  }
-  
-}
-
-v[13]=min(V("KQ"),v[3]);
-v[15]=V("KQ")-v[3];
-v[16]=v[15]-v[0];
-//if(v[15]>0 && v[15]!=v[0])
-//INTERACT("check the correspondence between production and KQ",v[16]);
-//if(v[15]<0 && v[0]!=0)
-//INTERACT("check the correspondence between production and KQ",v[0]);
-
-
-
-
-RESULT(v[13] )
-  
-  
   
 
 
