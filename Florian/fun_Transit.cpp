@@ -394,7 +394,7 @@ RESULT(v[13] )
 
 EQUATION("GreenKQ")
 /*
-Comment
+Production capacity of GreenKF = Nbr Workers * Labor Productivity
 */
 
 v[0]=V("GreenKNbrWorkers");
@@ -406,7 +406,7 @@ RESULT((v[0]*v[1]) )
 
 EQUATION("BrownKQ")
 /*
-Comment
+Production capacity of BrownKF = Nbr Workers * Labor Productivity
 */
 
 v[0]=V("BrownKNbrWorkers");
@@ -5109,7 +5109,7 @@ CYCLE(cur, "KFirm")
       else	
         cur1=ADDOBJS(cur,"Order");
       
-      WRITES(cur1,"GreenOrder",0);
+      //WRITES(cur1,"GreenOrder",0); Useless in the transit model
       
       //if(v[44]<v[3]*v[6])
       //v[63]=v[44]/v[6]; //REMOVED THE RATIONING DUE TO INSUFFICIENT NETWORTH

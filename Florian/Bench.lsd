@@ -363,7 +363,6 @@ Label Root
 						Param: IdClient
 						Param: KEfficiency
 						Param: GreenKProd
-						Param: GreenOrder
 						Param: OrderGreenId
 						Param: OrderAlpha
 
@@ -412,7 +411,6 @@ Label Root
 					Param: GreenKProdShock
 					Var: KGreenSpe
 					Param: IdKFirm
-					Param: GreenKAmount
 					Var: GreenGrade
 					Var: NbrOrders
 					Param: LocalGreenInvestment
@@ -608,14 +606,64 @@ Label Root
 				Son: GreenKF
 				Label GreenKF
 				{
+					Son: GreenKLabor
+					Label GreenKLabor
+					{
+						Param: GreenKNbrWorkers
+						Param: GreenKLaborProductivity
+
+					}
+
+					Son: GreenOrder
+					Label GreenOrder
+					{
+						Param: GreenKCompletion
+						Param: GreenKAmount
+
+					}
+
+					Son: BankGreenK
+					Label BankGreenK
+					{
+						Param: GreenKRevenues
+
+					}
+
 					Var: GreenKProductionFlow
+					Var: GreenKQ
+					Param: GreenNumOrders
 
 				}
 
 				Son: BrownKF
 				Label BrownKF
 				{
+					Son: BrownKLabor
+					Label BrownKLabor
+					{
+						Param: BrownKNbrWorkers
+						Param: BrownKLaborProductivity
+
+					}
+
+					Son: BrownOrder
+					Label BrownOrder
+					{
+						Param: BrownKCompletion
+						Param: BrownKAmount
+
+					}
+
+					Son: BankBrownK
+					Label BankBrownK
+					{
+						Param: BrownKRevenues
+
+					}
+
 					Var: BrownKProductionFlow
+					Var: BrownKQ
+					Param: BrownNumOrders
 
 				}
 
@@ -1251,7 +1299,6 @@ Var: ProbToSwitch 0 s + n n
 Param: GreenKProdShock 0 s + n n	0.00045	0.00045	0.00045	0.00045	0.00045	0.00045	0.00045	0.00045	0.00045	0.00045
 Var: KGreenSpe 0 s + n n
 Param: IdKFirm 0 n + n n	1	2	3	4	5	6	7	8	9	10
-Param: GreenKAmount 0 n + n n	0	0	0	0	0	0	0	0	0	0
 Var: GreenGrade 1 n + n n	1	0	0	0	0	0	0	0	0	0
 Var: NbrOrders 0 n + n n
 Param: LocalGreenInvestment 0 s + n n	0	0	0	0	0	0	0	0	0	0
@@ -1296,7 +1343,6 @@ Param: KP 0 n + n n	1023.82294055854	1016.6765784381	1019.04472666191	1021.44540
 Param: IdClient 0 n + n n	-1	-1	-1	-1	937	-1	-1	-1	1004	1018	1066	1067	1068	1069	1071	1073	1079	1081	1082	1084	1088	1089	1091	1092	-1
 Param: KEfficiency 0 n + n n	0	0	0	0	0.0252113810640374	0	0	0	0.0269921137596109	0.0269921137596109	0.0269921137596109	0.0269921137596109	0.0269921137596109	0.0269921137596109	0.0269921137596109	0.0269921137596109	0.0269921137596109	0.0269921137596109	0.0269921137596109	0.0269921137596109	0.0269921137596109	0.0269921137596109	0.0269921137596109	0.0269921137596109	0
 Param: GreenKProd 0 n + n n	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1
-Param: GreenOrder 0 n + n n	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
 Param: OrderGreenId 0 n + n n	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
 Param: OrderAlpha 0 n + n n	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0	0
 
@@ -1435,9 +1481,35 @@ Object: EnergyMachinery C	1
 
 Object: GreenKF C	10
 Var: GreenKProductionFlow 0 n + n n
+Var: GreenKQ 0 n + n n
+Param: GreenNumOrders 0 n + n n	1	1	1	1	1	1	1	1	1	1
+
+Object: GreenKLabor C	1	1	1	1	1	1	1	1	1	1
+Param: GreenKNbrWorkers 1 n + n n	500	500	500	500	500	500	500	500	500	500
+Param: GreenKLaborProductivity 0 n + n n	1	1	1	1	1	1	1	1	1	1
+
+Object: GreenOrder C	1	1	1	1	1	1	1	1	1	1
+Param: GreenKCompletion 0 n + n n	0	0	0	0	0	0	0	0	0	0
+Param: GreenKAmount 0 n + n n	1	1	1	1	1	1	1	1	1	1
+
+Object: BankGreenK C	1	1	1	1	1	1	1	1	1	1
+Param: GreenKRevenues 0 n + n n	0	0	0	0	0	0	0	0	0	0
 
 Object: BrownKF C	10
 Var: BrownKProductionFlow 0 n + n n
+Var: BrownKQ 0 n + n n
+Param: BrownNumOrders 0 n + n n	1	1	1	1	1	1	1	1	1	1
+
+Object: BrownKLabor C	1	1	1	1	1	1	1	1	1	1
+Param: BrownKNbrWorkers 1 n + n n	500	500	500	500	500	500	500	500	500	500
+Param: BrownKLaborProductivity 0 n + n n	1	1	1	1	1	1	1	1	1	1
+
+Object: BrownOrder C	1	1	1	1	1	1	1	1	1	1
+Param: BrownKCompletion 0 n + n n	0	0	0	0	0	0	0	0	0	0
+Param: BrownKAmount 0 n + n n	1	1	1	1	1	1	1	1	1	1
+
+Object: BankBrownK C	1	1	1	1	1	1	1	1	1	1
+Param: BrownKRevenues 0 n + n n	0	0	0	0	0	0	0	0	0	0
 
 SIM_NUM 1
 SEED 1
@@ -4129,12 +4201,6 @@ _INIT_
 All 10 instances increasing from 1 with steps 1. The value is increased every 1 instances.
 END_DESCRIPTION
 
-Parameter_GreenKAmount
-(no description available)
-_INIT_
-All 1 instances equal to 0.
-END_DESCRIPTION
-
 Variable_GreenGrade
 (no description available)
 _INIT_
@@ -4373,13 +4439,6 @@ Parameter_GreenKProd
 (no description available)
 _INIT_
 All 1 instances equal to 1.
-END_DESCRIPTION
-
-Parameter_GreenOrder
-=1 if ordered by the energy sector
-=0 if ordered by a Firm
-_INIT_
-All 25 instances equal to 0.
 END_DESCRIPTION
 
 Parameter_OrderGreenId
@@ -5142,7 +5201,69 @@ END_DESCRIPTION
 
 Variable_GreenKProductionFlow
 Production of GreenKF
+_INIT_
 
+END_DESCRIPTION
+
+Variable_GreenKQ
+Production capacity of GreenKF = Nbr Workers * Labor Productivity
+_INIT_
+
+END_DESCRIPTION
+
+Parameter_GreenNumOrders
+Number of green orders of a green capital producer
+_INIT_
+All 10 instances equal to 1.
+END_DESCRIPTION
+
+Object_GreenKLabor
+Labor force of green capital firms
+_INIT_
+
+END_DESCRIPTION
+
+Parameter_GreenKNbrWorkers
+Number of workers in green capital firms
+_INIT_
+All 10 instances equal to 500.
+END_DESCRIPTION
+
+Parameter_GreenKLaborProductivity
+Productivity of workers in green capital firms
+_INIT_
+All 10 instances equal to 1.
+END_DESCRIPTION
+
+Parameter_GreenOrder
+=1 if ordered by the energy sector
+=0 if ordered by a Firm
+_INIT_
+All 25 instances equal to 0.
+END_DESCRIPTION
+
+Parameter_GreenKCompletion
+Amount of order already produced
+_INIT_
+All 10 instances equal to 0.
+END_DESCRIPTION
+
+Parameter_GreenKAmount
+(no description available)
+_INIT_
+All 10 instances equal to 1.
+END_DESCRIPTION
+
+Object_BankGreenK
+(no description available)
+_INIT_
+
+END_DESCRIPTION
+
+Parameter_GreenKRevenues
+(no description available)
+_INIT_
+All 10 instances equal to 0.
 END_DESCRIPTION
 
 Object_BrownKF
@@ -5153,7 +5274,68 @@ END_DESCRIPTION
 
 Variable_BrownKProductionFlow
 Production of brown capital
+_INIT_
 
+END_DESCRIPTION
+
+Variable_BrownKQ
+(no description available)
+_INIT_
+
+END_DESCRIPTION
+
+Parameter_BrownNumOrders
+Number of brown orders of a brown capital producer
+_INIT_
+All 10 instances equal to 1.
+END_DESCRIPTION
+
+Object_BrownKLabor
+Labor force of green capital firms
+_INIT_
+
+END_DESCRIPTION
+
+Parameter_BrownKNbrWorkers
+Number of workers in brown capital firms
+_INIT_
+All 10 instances equal to 500.
+END_DESCRIPTION
+
+Parameter_BrownKLaborProductivity
+Productivity of workers in brown capital firms
+_INIT_
+All 10 instances equal to 1.
+END_DESCRIPTION
+
+Object_BrownOrder
+Orders of brown capital
+_INIT_
+
+END_DESCRIPTION
+
+Parameter_BrownKCompletion
+(no description available)
+_INIT_
+All 10 instances equal to 0.
+END_DESCRIPTION
+
+Parameter_BrownKAmount
+size of the order of brown capital
+_INIT_
+All 10 instances equal to 1.
+END_DESCRIPTION
+
+Object_BankBrownK
+(no description available)
+_INIT_
+
+END_DESCRIPTION
+
+Parameter_BrownKRevenues
+(no description available)
+_INIT_
+All 10 instances equal to 0.
 END_DESCRIPTION
 
 
@@ -5331,6 +5513,7 @@ KAmount
 KCompletion
 TimeWaited
 Kproductivity
+GreenKRevenues
 
 END_DOCUINITIAL
 
