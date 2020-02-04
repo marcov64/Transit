@@ -389,7 +389,30 @@ v[16]=v[15]-v[0];
 //INTERACT("check the correspondence between production and KQ",v[0]);
 
 RESULT(v[13] )
-  
+
+
+
+EQUATION("GreenKQ")
+/*
+Comment
+*/
+
+v[0]=V("GreenKNbrWorkers");
+v[1]=V("GreenKLaborProductivity");
+
+RESULT((v[0]*v[1]) )
+
+
+
+EQUATION("BrownKQ")
+/*
+Comment
+*/
+
+v[0]=V("BrownKNbrWorkers");
+v[1]=V("BrownKLaborProductivity");
+
+RESULT((v[0]*v[1]) )
   
   
 
