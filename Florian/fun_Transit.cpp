@@ -2690,8 +2690,20 @@ v[50]=V("AvMaxEfficiency");
 WRITELS(cur4,"IncEfficiency",v[50],t);
 
 
-cur5=SEARCHS(cur1,"blItem");
-WRITES(cur5,"blPrice",0.5*V("AvPrice"));
+//cur5=SEARCHS(cur1,"blItem");
+//WRITES(cur5,"blPrice",0.5*V("AvPrice"));
+
+WRITES(cur1, "numBLI", 0);
+
+v[44]=0;
+CYCLE_SAFES(cur1, cur, "blItem")
+{
+	if(v[44]==1)
+	DELETE(cur);
+	else
+	WRITES(cur, "blQ", 0); 
+	v[44]=1;
+}
 
 
 
