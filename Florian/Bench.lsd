@@ -337,7 +337,6 @@ Label Root
 						Param: KShareGreenKProd
 						Var: KNbrEngiProductionEff
 						Var: KNbrGreenKProd
-						Var: KSpecialization
 
 					}
 
@@ -346,7 +345,6 @@ Label Root
 					{
 						Var: CurrentProductivity
 						Var: CurrentEfficiency
-						Var: GreenProductivity
 						Var: MaxENProduction
 						Var: GreenEnergyCost
 
@@ -407,11 +405,8 @@ Label Root
 					Var: KMaxEnergyEfficiency
 					Param: EfficiencyShock
 					Param: EnergyEfficiencyShock
-					Var: ProbToSwitch
 					Param: GreenKProdShock
-					Var: KGreenSpe
 					Param: IdKFirm
-					Var: GreenGrade
 					Var: NbrOrders
 					Param: LocalGreenInvestment
 
@@ -629,9 +624,20 @@ Label Root
 
 					}
 
+					Son: GreenKCapital
+					Label GreenKCapital
+					{
+						Param: GreenKProductivity
+
+					}
+
 					Var: GreenKProductionFlow
 					Var: GreenKQ
 					Param: GreenNumOrders
+					Func: GreenKGrading
+					Param: GreenWaitTime
+					Param: GreenKPrice
+					Param: GreenKGrade
 
 				}
 
@@ -661,9 +667,20 @@ Label Root
 
 					}
 
+					Son: BrownKCapital
+					Label BrownKCapital
+					{
+						Param: BrownKProductivity
+
+					}
+
 					Var: BrownKProductionFlow
 					Var: BrownKQ
 					Param: BrownNumOrders
+					Func: BrownKGrading
+					Param: BrownKPrice
+					Param: BrownWaitTime
+					Param: BrownKGrade
 
 				}
 
@@ -675,10 +692,8 @@ Label Root
 			Var: Andre
 			Param: AvAge
 			Param: AvCurrentProductivity
-			Param: AvGreenEnergyCostSpe
 			Param: AvKProfit
 			Var: AvMarkup
-			Param: AvMaxENProduction
 			Var: AvMaxLProd
 			Param: AvMkup
 			Var: AvPrice
@@ -814,14 +829,9 @@ Label Root
 			Var: ENNominal
 			Var: ENGDPRatio
 			Param: EnergyGdpRatio
-			Param: AvGreenProductivitySpe
-			Param: AvGreenKPriceSpe
 			Var: PriceENGr
 			Var: MinWageGr
-			Var: NbrKGreenSpe
 			Var: AvSpe
-			Param: NbrGreenKInno
-			Var: AvGreenProductivity
 
 		}
 
@@ -848,10 +858,8 @@ Var: AllocateBlRecouped 0 n + n n
 Var: Andre 0 n + n n
 Param: AvAge 0 n + n n	101.265306122449
 Param: AvCurrentProductivity 0 s + n n	2.33607443076569
-Param: AvGreenEnergyCostSpe 0 s + n n	0
 Param: AvKProfit 0 n + n n	-431345.520040386
 Var: AvMarkup 0 s + n n
-Param: AvMaxENProduction 0 s + n n	0
 Var: AvMaxLProd 0 n + n n
 Param: AvMkup 0 n + n n	1.33946463110004
 Var: AvPrice 1 n + n n	584.332774328833
@@ -874,7 +882,7 @@ Func: FlippingCoin 0 n + n n
 Param: GDPConcentration 0 s + n n	7.92063936621705
 Var: GDPConstantCapita 0 s + n n
 Var: GdpCGrowth 1 s + n n	-0.0259453736870316
-Param: GdpConstant 1 s + n p	381794377.774024
+Param: GdpConstant 1 s + n n	381794377.774024
 Param: GdpConstantF 0 s + n n	249304594.770088
 Param: GdpConstantK 0 s + n n	12782522.5299748
 Param: GdpConstant_lag 0 n + n n	391964031.030998
@@ -987,14 +995,9 @@ Param: zero 0 s + n n	0
 Var: ENNominal 0 s + n n
 Var: ENGDPRatio 0 s + n n
 Param: EnergyGdpRatio 0 s + n n	0
-Param: AvGreenProductivitySpe 0 s + n n	0
-Param: AvGreenKPriceSpe 0 s + n n	0
 Var: PriceENGr 0 s + n n
 Var: MinWageGr 0 s + n n
-Var: NbrKGreenSpe 0 s + n n
 Var: AvSpe 0 n + n n
-Param: NbrGreenKInno 1 s + n n	0
-Var: AvGreenProductivity 0 s + n n
 
 Object: Supply C	1
 Param: aES 0 n + n n	0.9
@@ -1295,11 +1298,8 @@ Var: KUnitEnergyCost 1 n + n n	0.0502894605995961	0.0503505229082078	0.050309822
 Var: KMaxEnergyEfficiency 1 n + n n	0.001	0.001	0.001	0.001	0.001	0.001	0.001	0.001	0.001	0.001
 Param: EfficiencyShock 0 s + n n	0.0001	0.0001	0.0001	0.0001	0.0001	0.0001	0.0001	0.0001	0.0001	0.0001
 Param: EnergyEfficiencyShock 0 s + n n	0.0001	0.0001	0.0001	0.0001	0.0001	0.0001	0.0001	0.0001	0.0001	0.0001
-Var: ProbToSwitch 0 s + n n
 Param: GreenKProdShock 0 s + n n	0.00045	0.00045	0.00045	0.00045	0.00045	0.00045	0.00045	0.00045	0.00045	0.00045
-Var: KGreenSpe 0 s + n n
 Param: IdKFirm 0 n + n n	1	2	3	4	5	6	7	8	9	10
-Var: GreenGrade 1 n + n n	1	0	0	0	0	0	0	0	0	0
 Var: NbrOrders 0 n + n n
 Param: LocalGreenInvestment 0 s + n n	0	0	0	0	0	0	0	0	0	0
 
@@ -1325,12 +1325,10 @@ Param: KShareEngiProductionEff 0 s + n n	0.1	0.1	0.1	0.1	0.1	0.1	0.1	0.1	0.1	0.1
 Param: KShareGreenKProd 0 s + n n	0.3	0.3	0.3	0.3	0.3	0.3	0.3	0.3	0.3	0.3
 Var: KNbrEngiProductionEff 0 s + n n
 Var: KNbrGreenKProd 0 s + n n
-Var: KSpecialization 1 n + n n	1	1	1	1	1	1	1	1	1	1
 
 Object: KCapital C	1	1	1	1	1	1	1	1	1	1
 Var: CurrentProductivity 1 s + n n	2.85463263867451	2.3065415854947	2.19021951768274	2.4845957088543	2.23412553680321	2.26517379359015	2.21332336835704	2.20940038011061	2.35387240342176	2.24885937466793
 Var: CurrentEfficiency 1 s + n n	0.005	0.005	0.005	0.005	0.005	0.005	0.005	0.005	0.005	0.005
-Var: GreenProductivity 1 s + n n	0.25	0.25	0.25	0.25	0.25	0.25	0.25	0.25	0.25	0.25
 Var: MaxENProduction 0 n + n n
 Var: GreenEnergyCost 0 n + n n
 
@@ -1480,9 +1478,13 @@ Param: BrownK 0 n + n n	1000000000	1000000000	1000000000	1000000000	1000000000	1
 Object: EnergyMachinery C	1
 
 Object: GreenKF C	10
-Var: GreenKProductionFlow 0 n + n n
-Var: GreenKQ 0 n + n n
-Param: GreenNumOrders 0 n + n n	1	1	1	1	1	1	1	1	1	1
+Var: GreenKProductionFlow 0 s + n n
+Var: GreenKQ 0 s + n n
+Param: GreenNumOrders 0 s + n n	1	1	1	1	1	1	1	1	1	1
+Func: GreenKGrading 0 n + n n
+Param: GreenWaitTime 0 s + n n	1	1	1	1	1	1	1	1	1	1
+Param: GreenKPrice 0 s + n n	1000	1000	1000	1000	1000	1000	1000	1000	1000	1000
+Param: GreenKGrade 0 s + n n	1	1	1	1	1	1	1	1	1	1
 
 Object: GreenKLabor C	1	1	1	1	1	1	1	1	1	1
 Param: GreenKNbrWorkers 1 n + n n	500	500	500	500	500	500	500	500	500	500
@@ -1490,15 +1492,22 @@ Param: GreenKLaborProductivity 0 n + n n	1	1	1	1	1	1	1	1	1	1
 
 Object: GreenOrder C	1	1	1	1	1	1	1	1	1	1
 Param: GreenKCompletion 0 n + n n	0	0	0	0	0	0	0	0	0	0
-Param: GreenKAmount 0 n + n n	1	1	1	1	1	1	1	1	1	1
+Param: GreenKAmount 0 n + n n	0	0	0	0	0	0	0	0	0	0
 
 Object: BankGreenK C	1	1	1	1	1	1	1	1	1	1
 Param: GreenKRevenues 0 n + n n	0	0	0	0	0	0	0	0	0	0
 
+Object: GreenKCapital C	1	1	1	1	1	1	1	1	1	1
+Param: GreenKProductivity 0 s + n n	1	1	1	1	1	1	1	1	1	1
+
 Object: BrownKF C	10
-Var: BrownKProductionFlow 0 n + n n
-Var: BrownKQ 0 n + n n
-Param: BrownNumOrders 0 n + n n	1	1	1	1	1	1	1	1	1	1
+Var: BrownKProductionFlow 0 s + n n
+Var: BrownKQ 0 s + n n
+Param: BrownNumOrders 0 s + n n	1	1	1	1	1	1	1	1	1	1
+Func: BrownKGrading 0 s + n n
+Param: BrownKPrice 0 s + n n	1000	1000	1000	1000	1000	1000	1000	1000	1000	1000
+Param: BrownWaitTime 0 s + n n	1	1	1	1	1	1	1	1	1	1
+Param: BrownKGrade 0 s + n n	1	1	1	1	1	1	1	1	1	1
 
 Object: BrownKLabor C	1	1	1	1	1	1	1	1	1	1
 Param: BrownKNbrWorkers 1 n + n n	500	500	500	500	500	500	500	500	500	500
@@ -1506,10 +1515,13 @@ Param: BrownKLaborProductivity 0 n + n n	1	1	1	1	1	1	1	1	1	1
 
 Object: BrownOrder C	1	1	1	1	1	1	1	1	1	1
 Param: BrownKCompletion 0 n + n n	0	0	0	0	0	0	0	0	0	0
-Param: BrownKAmount 0 n + n n	1	1	1	1	1	1	1	1	1	1
+Param: BrownKAmount 0 n + n n	0	0	0	0	0	0	0	0	0	0
 
 Object: BankBrownK C	1	1	1	1	1	1	1	1	1	1
 Param: BrownKRevenues 0 n + n n	0	0	0	0	0	0	0	0	0	0
+
+Object: BrownKCapital C	1	1	1	1	1	1	1	1	1	1
+Param: BrownKProductivity 0 s + n n	1	1	1	1	1	1	1	1	1	1
 
 SIM_NUM 1
 SEED 1
@@ -1577,12 +1589,6 @@ _INIT_
 
 END_DESCRIPTION
 
-Parameter_AvGreenEnergyCostSpe
-(no description available)
-_INIT_
-All 1 instances equal to 0.
-END_DESCRIPTION
-
 Parameter_AvKProfit
 Average of the capital firms profits
 _INIT_
@@ -1593,12 +1599,6 @@ Variable_AvMarkup
 Averege consumer firms markup
 _INIT_
 
-END_DESCRIPTION
-
-Parameter_AvMaxENProduction
-(no description available)
-_INIT_
-All 1 instances equal to 0.
 END_DESCRIPTION
 
 Variable_AvMaxLProd
@@ -2413,18 +2413,6 @@ _INIT_
 All 1 instances equal to 0.
 END_DESCRIPTION
 
-Parameter_AvGreenProductivitySpe
-(no description available)
-_INIT_
-All 1 instances equal to 0.
-END_DESCRIPTION
-
-Parameter_AvGreenKPriceSpe
-(no description available)
-_INIT_
-All 1 instances equal to 0.
-END_DESCRIPTION
-
 Variable_PriceENGr
 (no description available)
 _INIT_
@@ -2437,28 +2425,10 @@ _INIT_
 
 END_DESCRIPTION
 
-Variable_NbrKGreenSpe
-(no description available)
-_INIT_
-
-END_DESCRIPTION
-
 Variable_AvSpe
  Compute the average energy cost to produce green energy of specialized KFirms
 _INIT_
 
-END_DESCRIPTION
-
-Parameter_NbrGreenKInno
-(no description available)
-_INIT_
-All 1 instances equal to 0.
-END_DESCRIPTION
-
-Variable_AvGreenProductivity
-(no description available)
-_INIT_
-All 1 instances equal to 0.
 END_DESCRIPTION
 
 Object_Supply
@@ -4177,34 +4147,16 @@ _INIT_
 All 10 instances equal to 0.0001.
 END_DESCRIPTION
 
-Variable_ProbToSwitch
-Probability to switch specialization
-_INIT_
-All 10 instances equal to 0.5.
-END_DESCRIPTION
-
 Parameter_GreenKProdShock
 (no description available)
 _INIT_
 All 30 instances equal to 0.00045.
 END_DESCRIPTION
 
-Variable_KGreenSpe
-(no description available)
-_INIT_
-All 20 instances equal to 0.
-END_DESCRIPTION
-
 Parameter_IdKFirm
 (no description available)
 _INIT_
 All 10 instances increasing from 1 with steps 1. The value is increased every 1 instances.
-END_DESCRIPTION
-
-Variable_GreenGrade
-(no description available)
-_INIT_
-All 10 instances equal to 0.
 END_DESCRIPTION
 
 Variable_NbrOrders
@@ -4345,12 +4297,6 @@ _INIT_
 
 END_DESCRIPTION
 
-Variable_KSpecialization
-(no description available)
-_INIT_
-All 10 instances equal to 0.
-END_DESCRIPTION
-
 Object_KCapital
 (no description available )
 _INIT_
@@ -4367,12 +4313,6 @@ Variable_CurrentEfficiency
 (no description available)
 _INIT_
 All 20 instances equal to 0.005.
-END_DESCRIPTION
-
-Variable_GreenProductivity
-(no description available)
-_INIT_
-All 10 instances equal to 0.25.
 END_DESCRIPTION
 
 Variable_MaxENProduction
@@ -5217,6 +5157,30 @@ _INIT_
 All 10 instances equal to 1.
 END_DESCRIPTION
 
+Function_GreenKGrading
+Build an index to distribute demand across KFirms   
+_INIT_
+
+END_DESCRIPTION
+
+Parameter_GreenWaitTime
+(no description available)
+_INIT_
+All 10 instances equal to 1.
+END_DESCRIPTION
+
+Parameter_GreenKPrice
+(no description available)
+_INIT_
+All 10 instances equal to 1000.
+END_DESCRIPTION
+
+Parameter_GreenKGrade
+(no description available)
+_INIT_
+All 1 instances equal to 1.
+END_DESCRIPTION
+
 Object_GreenKLabor
 Labor force of green capital firms
 _INIT_
@@ -5251,7 +5215,7 @@ END_DESCRIPTION
 Parameter_GreenKAmount
 (no description available)
 _INIT_
-All 10 instances equal to 1.
+All 10 instances equal to 0.
 END_DESCRIPTION
 
 Object_BankGreenK
@@ -5264,6 +5228,18 @@ Parameter_GreenKRevenues
 (no description available)
 _INIT_
 All 10 instances equal to 0.
+END_DESCRIPTION
+
+Object_GreenKCapital
+(no description available)
+_INIT_
+
+END_DESCRIPTION
+
+Parameter_GreenKProductivity
+(no description available)
+_INIT_
+All 10 instances equal to 1.
 END_DESCRIPTION
 
 Object_BrownKF
@@ -5286,6 +5262,30 @@ END_DESCRIPTION
 
 Parameter_BrownNumOrders
 Number of brown orders of a brown capital producer
+_INIT_
+All 10 instances equal to 1.
+END_DESCRIPTION
+
+Function_BrownKGrading
+Build an index to distribute demand across KFirms   
+_INIT_
+
+END_DESCRIPTION
+
+Parameter_BrownKPrice
+(no description available)
+_INIT_
+All 10 instances equal to 1000.
+END_DESCRIPTION
+
+Parameter_BrownWaitTime
+(no description available)
+_INIT_
+All 10 instances equal to 1.
+END_DESCRIPTION
+
+Parameter_BrownKGrade
+(no description available)
 _INIT_
 All 10 instances equal to 1.
 END_DESCRIPTION
@@ -5323,7 +5323,7 @@ END_DESCRIPTION
 Parameter_BrownKAmount
 size of the order of brown capital
 _INIT_
-All 10 instances equal to 1.
+All 10 instances equal to 0.
 END_DESCRIPTION
 
 Object_BankBrownK
@@ -5336,6 +5336,18 @@ Parameter_BrownKRevenues
 (no description available)
 _INIT_
 All 10 instances equal to 0.
+END_DESCRIPTION
+
+Object_BrownKCapital
+(no description available)
+_INIT_
+
+END_DESCRIPTION
+
+Parameter_BrownKProductivity
+(no description available)
+_INIT_
+All 10 instances equal to 1.
 END_DESCRIPTION
 
 

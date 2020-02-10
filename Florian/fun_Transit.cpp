@@ -413,7 +413,111 @@ v[0]=V("BrownKNbrWorkers");
 v[1]=V("BrownKLaborProductivity");
 
 RESULT((v[0]*v[1]) )
-  
+
+
+
+
+EQUATION("GreenKGrading") // Called by 
+/*
+Build an index to distribute demand across KFirms   
+*/
+v[50]=v[40]=v[70]=v[90]=0;
+// Use CYCLE to compute averages
+CYCLE(cur1,"GreenKF")
+{
+  //sprintf(msg, "\n IdKFirm %g", VS(cur1,"IdKFirm") ); plog(msg);
+  if(cur1==NULL)
+    INTERACT("cur NULL",v[50]);
+  cur=SEARCHS(cur1,"GreenKCapital");
+  if(cur==NULL)
+    INTERACT("cur NULL",v[40]);
+
+  v[40]=VS(cur,"GreenKProductivity");
+  //sprintf(msg, "\n GreenKProductivity %g", v[40] ); plog(msg);
+    
+  v[50]=v[50]+v[40];
+  v[41]=VS(cur1,"GreenKPrice");
+  //sprintf(msg, "\n KPrice %g", v[41] ); plog(msg);
+  v[51]=v[51]+v[41];
+  v[42]=VS(cur1,"GreenWaitTime");	
+  v[52]=v[52]+v[42];
+  v[90]++;
+
+
+v[80]=v[50]/v[90]; // Av GreenKProductivity           
+v[81]=v[51]/v[90]; // Av GreenKPrice
+v[82]=v[52]/v[90]; // Av GreenWaitTime
+//sprintf(msg, "\n Av GreenKProductivity %g", v[80] ); plog(msg);
+    
+    v[60]=v[40]/v[80]; // Normalize GreenKProductivity 
+    sprintf(msg, "\n Normalized green producitivity %g", v[60] ); plog(msg);
+    v[61]=v[41]/v[81]; // Normalize GreenKPrice
+    sprintf(msg, "\n Normalized GreenKPrice %g", v[61] ); plog(msg);
+    v[62]=v[42]/v[82]; // Normalize GreenWaitTime
+    sprintf(msg, "\n Normalized time %g", v[62] ); plog(msg);
+    v[70]=pow(v[60],0.33333)*pow(v[61],-0.33333)*pow(v[62],-0.33333); //grade of KFirms /!\ pow(v[xx],1/3) always return 1.
+    //sprintf(msg, "\n test %g", pow(v[60],(0.33333)) ); plog(msg);
+    
+    v[0]=v[70];
+    WRITES(cur1,"GreenKGrade",v[70]);
+    //sprintf(msg, "\n GreenKGrade %g", v[70] ); plog(msg);
+}  
+
+RESULT(1 )
+
+
+
+
+EQUATION("BrownKGrading") // Called by 
+/*
+Build an index to distribute demand across KFirms   
+*/
+v[50]=v[40]=0;
+// Use CYCLE to compute averages
+CYCLE(cur1,"BrownKF")
+{
+  //sprintf(msg, "\n IdKFirm %g", VS(cur1,"IdKFirm") ); plog(msg);
+  if(cur1==NULL)
+    INTERACT("cur NULL",v[50]);
+  cur=SEARCHS(cur1,"BrownKCapital");
+  if(cur==NULL)
+    INTERACT("cur NULL",v[40]);
+
+  v[40]=VS(cur,"BrownKProductivity");
+  //sprintf(msg, "\n BrownKProductivity %g", v[40] ); plog(msg);
+    
+  v[50]=v[50]+v[40];
+  v[41]=VS(cur1,"BrownKPrice");
+  //sprintf(msg, "\n BrownKPrice %g", v[41] ); plog(msg);
+  v[51]=v[51]+v[41];
+  v[42]=VS(cur1,"BrownWaitTime");	
+  v[52]=v[52]+v[42];
+  v[90]++;
+
+
+v[80]=v[50]/v[90]; // Av BrownKProductivity           
+v[81]=v[51]/v[90]; // Av BrownKPrice
+v[82]=v[52]/v[90]; // Av BrownWaitTime
+//sprintf(msg, "\n Av BrownKProductivity %g", v[80] ); plog(msg);
+    
+    v[60]=v[40]/v[80]; // Normalize BrownKProductivity 
+    //sprintf(msg, "\n Normalized Brown K producitivity %g", v[60] ); plog(msg);
+    v[61]=v[41]/v[81]; // Normalize BrownKPrice
+    //sprintf(msg, "\n Normalized BrownKPrice %g", v[61] ); plog(msg);
+    v[62]=v[42]/v[82]; // Normalize BrownWaitTime
+    //sprintf(msg, "\n Normalized time %g", v[62] ); plog(msg);
+    v[70]=pow(v[60],0.33333)*pow(v[61],-0.33333)*pow(v[62],-0.33333); //grade of KFirms /!\ pow(v[xx],1/3) always return 1.
+    //sprintf(msg, "\n test %g", pow(v[60],(0.33333)) ); plog(msg);
+    
+    v[0]=v[70];
+    WRITES(cur1,"BrownKGrade",v[70]);
+    //sprintf(msg, "\n BrownKGrade %g", v[70] ); plog(msg);
+}  
+
+RESULT(v[0] )
+    
+    
+
   
 
 
@@ -649,7 +753,192 @@ WRITES(cur2, "LocalGreenInvestmentOrder",0);
 
  */
 RESULT(1 )
+
+
+
+
+EQUATION("AvSpe") // Called by Country
+/*
+ Compute the average energy cost to produce green energy of specialized KFirms
+
+v[0]=v[1]=v[2]=v[3]=v[10]=v[11]=v[20]=v[21]=v[22]=v[30]=v[31]=v[32]=v[40]=v[41]=v[42]=0;
+CYCLE(cur,"KFirm")
+{
+  V("KGreenSpe"); // make sure KFirms that can access the market are above average
+  if(VS(cur,"KGreenSpe")==1 )
+  {
+    v[1]=VS(cur,"GreenEnergyCost");
+    v[20]=VS(cur,"GreenProductivity");
+    v[30]=VS(cur,"KPrice");
+    v[40]=VS(cur,"MaxENProduction");
+    
+    // begin consistency check
+    cur1=SEARCHS(cur,"KCapital");
+    v[10]=VS(cur1,"GreenEnergyCost");
+    if(v[1]!=v[10])
+    {INTERACT("consistency issue GreenEnergyCost",v[10]);}
+    v[11]=VS(cur1,"GreenProductivity");
+    if(v[20]!=v[11]){INTERACT("consistency issue GreenProductivity",v[11]);}
+    v[12]=VS(cur1,"KPrice");
+    if(v[30]!=v[12]){INTERACT("consistency issue KPrice",v[12]);}
+    v[13]=VS(cur1,"MaxENProduction");
+    if(v[40]!=v[13]){INTERACT("consistency issue MaxENProduction",v[13]);}
+    // end consistency check
+    
+    v[0]=v[0]+v[1]; // sum of energy cost
+    v[21]=v[21]+v[20]; // sum of green productivity
+    v[31]=v[31]+v[30]; // sum of KPrice
+    v[41]=v[41]+v[40]; // sum of MaxENProduction
+    v[2]=v[2]+1; // number of specialised firms
+  }  
+}
+
+if(v[2]==0)
+{
+  INTERACT("zero spe KFirm ",v[2]); // check if there is at least one specilised firm
+  //END_EQUATION(666 );
+}
+else
+{
+  v[3]=v[0]/v[2];
+  v[22]=v[21]/v[2];
+  v[32]=v[31]/v[2];
+  v[42]=v[41]/v[2];
+  v[52]=v[51]/v[2];
+}
+WRITE("AvGreenEnergyCostSpe",v[3]);
+WRITE("AvGreenProductivitySpe",v[22]);
+WRITE("AvGreenKPriceSpe",v[32]);
+WRITE("AvMaxENProduction",v[42]);
+WRITE("NbrGreenKInno",v[2]);
+
+ */
+RESULT(1 )
+
+
+
+
+EQUATION("ProbToSwitch")
+/*
+  Comment 
+
   
+//v[0]=VS(p->up,"MoAvGreenInvestmentGr");
+//INTERACT("MoAvGreenInvestmentGr",v[0]);
+
+//v[1]=VS(p->up,"MoAvInvestmentGr");
+//INTERACT("MoAvInvestmentGr",v[1]);
+
+v[0]=V("MoAvGreenInvestment");
+v[1]=VL("MoAvGreenInvestment",1);
+if(v[1]==0)
+	v[1]=1;
+	
+v[2]=VL("NbrGreenKInno",1);
+if(v[2]==0)
+	v[2]=1;
+
+v[3]=(v[0]/v[1]-1)/v[2]; // weighted growth rate of MoAvGreenInvestment
+
+v[4]=V("MoAvInvestment");
+v[5]=VL("MoAvInvestment",1);
+if(v[5]==0)
+	v[5]=0.0001;
+	
+v[6]=COUNT("KFirm")-VL("NbrGreenKInno",1);
+if(v[6]==0)
+	v[6]=1;
+
+v[7]=(v[4]/v[5]-1)/v[6]; // weighted growth rate of MoAvInvestment
+
+
+if(V("KShareGreenKProd")==0)
+  { // the kfirm currently focuses its R&D on final good firms
+  v[10]=(v[7]-v[3]);
+  if(v[10]>0) //if investment grows faster than green inv, there is no reason to switch
+  	v[10]=0;
+  }
+else
+  { // the kfirm currently focuses its R&D on energy productivity of solar panels
+  v[10]=(v[3]-v[7]);
+  if(v[10]>0) //investment grows faster than green inv, there is no reason to switch
+  	v[10]=0;
+  }
+//INTERACT("v2",v[2]);
+
+v[20]=1-exp(v[10]); // proba to switch specialization
+
+*/
+RESULT(v[20] )
+
+
+
+
+EQUATION("KSpecialization")
+/*
+Comment 
+
+
+  if (V("KShareEngiProductionEff")+V("KShareEngiEff")+V("KShareEngiProd")+V("KShareGreenKProd")!=1)
+  { 
+  INTERACT("start Sum of share != 1",v[1]);
+  }
+  
+v[0]=V("KShareEngiProductionEff");
+v[1]=V("KShareEngiEff");
+
+if(RND<V("ProbToSwitch"))
+  {
+  if(V("KShareGreenKProd")==0)
+    { // the kfirm currently focuses its R&D on final good firms and wants to switch
+    WRITE("KShareEngiEff",0);
+    WRITE("KShareEngiProd",0);
+    WRITE("KShareGreenKProd",1-v[0]);
+    //INTERACT("KSpeE",v[1]);
+
+    }
+  else
+    { // the kfirm currently focuses its R&D on energy productivity of solar panels and wants to switch
+    v[2]=VL("priceEN",1);
+    v[3]=V("priceEN");
+    v[4]=VL("MinWage",1);
+    v[5]=V("MinWage");
+    v[6]=v[3]/v[2]-1; //compute the growth rate of priceEN
+    v[7]=v[5]/v[4]-1; //compute the growth rate of MinWage
+    v[20]=V("psi_spe");
+    v[10]=v[1]*(1+(v[6]-v[7])*v[20]);   //INTERACT("start v10",v[10]);
+    if((v[10]+v[0]+V("KShareEngiProd"))>1 || v[10]<0)
+    	{
+    	v[10]=1-v[0]-V("KShareEngiProd");
+    	  //INTERACT("if v10",v[10]);
+    	}
+    	
+    WRITE("KShareEngiEff",v[10]);
+    WRITE("KShareEngiProd",1-v[0]-v[10]);
+    WRITE("KShareGreenKProd",0);
+    //INTERACT("KSpeF",v[1]);
+    }
+  }
+if (V("KShareEngiProductionEff")+V("KShareEngiEff")+V("KShareEngiProd")+V("KShareGreenKProd")!=1)
+  INTERACT("end Sum of share != 1",v[1]);
+  
+if (V("KShareEngiProductionEff")>1 || V("KShareEngiProductionEff")<0)
+  INTERACT("KShareEngiProductionEff out",v[1]);
+  
+if (V("KShareEngiEff")>1 || V("KShareEngiEff")<0)
+  INTERACT("KShareEngiEff out",v[1]);
+  
+if (V("KShareEngiProd")>1 || V("KShareEngiProd")<0)
+  INTERACT("KShareEngiProd out",v[1]);
+  
+if (V("KShareGreenKProd")>1 || V("KShareGreenKProd")<0)
+  INTERACT("KShareGreenKProd out",v[1]);
+
+*/
+
+RESULT(1 )
+  
+
 
 
 
@@ -1443,7 +1732,6 @@ EQUATION("KNbrEngiProd")
 /*
 Defines the number of engineers working on productivity
 */
-V("KSpecialization");
 
 v[0]=VL("KNbrEngineers",1);
 v[1]=V("KShareEngiProd");
@@ -1455,7 +1743,6 @@ EQUATION("KNbrEngiEff")
 /*
 Defines the number of engineers working on efficiency
 */
-V("KSpecialization");
 
 v[0]=VL("KNbrEngineers",1);
 v[1]=V("KShareEngiEff");
@@ -1467,7 +1754,6 @@ EQUATION("KNbrEngiProductionEff")
 /*
 Defines the number of engineers working on process efficiency
 */
-V("KSpecialization");
 
 v[0]=VL("KNbrEngineers",1);
 v[1]=V("KShareEngiProductionEff");
@@ -1694,57 +1980,6 @@ v[4]= 0.99*v[3]+0.11*v[2];  // MoAvMinWageGr
 
 RESULT(v[4] )
 
-EQUATION("ProbToSwitch")
-/*
-  Comment 
-*/
-  
-//v[0]=VS(p->up,"MoAvGreenInvestmentGr");
-//INTERACT("MoAvGreenInvestmentGr",v[0]);
-
-//v[1]=VS(p->up,"MoAvInvestmentGr");
-//INTERACT("MoAvInvestmentGr",v[1]);
-
-v[0]=V("MoAvGreenInvestment");
-v[1]=VL("MoAvGreenInvestment",1);
-if(v[1]==0)
-	v[1]=1;
-	
-v[2]=VL("NbrGreenKInno",1);
-if(v[2]==0)
-	v[2]=1;
-
-v[3]=(v[0]/v[1]-1)/v[2]; // weighted growth rate of MoAvGreenInvestment
-
-v[4]=V("MoAvInvestment");
-v[5]=VL("MoAvInvestment",1);
-if(v[5]==0)
-	v[5]=0.0001;
-	
-v[6]=COUNT("KFirm")-VL("NbrGreenKInno",1);
-if(v[6]==0)
-	v[6]=1;
-
-v[7]=(v[4]/v[5]-1)/v[6]; // weighted growth rate of MoAvInvestment
-
-
-if(V("KShareGreenKProd")==0)
-  { // the kfirm currently focuses its R&D on final good firms
-  v[10]=(v[7]-v[3]);
-  if(v[10]>0) //if investment grows faster than green inv, there is no reason to switch
-  	v[10]=0;
-  }
-else
-  { // the kfirm currently focuses its R&D on energy productivity of solar panels
-  v[10]=(v[3]-v[7]);
-  if(v[10]>0) //investment grows faster than green inv, there is no reason to switch
-  	v[10]=0;
-  }
-//INTERACT("v2",v[2]);
-
-v[20]=1-exp(v[10]); // proba to switch specialization
-
-RESULT(v[20] )
 
 
 
@@ -1766,69 +2001,6 @@ RESULT(v[20] )
 
 
 
-
-
-EQUATION("KSpecialization")
-/*
-Comment 
-*/
-  if (V("KShareEngiProductionEff")+V("KShareEngiEff")+V("KShareEngiProd")+V("KShareGreenKProd")!=1)
-  { 
-  INTERACT("start Sum of share != 1",v[1]);
-  }
-  
-v[0]=V("KShareEngiProductionEff");
-v[1]=V("KShareEngiEff");
-
-if(RND<V("ProbToSwitch"))
-  {
-  if(V("KShareGreenKProd")==0)
-    { // the kfirm currently focuses its R&D on final good firms and wants to switch
-    WRITE("KShareEngiEff",0);
-    WRITE("KShareEngiProd",0);
-    WRITE("KShareGreenKProd",1-v[0]);
-    //INTERACT("KSpeE",v[1]);
-
-    }
-  else
-    { // the kfirm currently focuses its R&D on energy productivity of solar panels and wants to switch
-    v[2]=VL("priceEN",1);
-    v[3]=V("priceEN");
-    v[4]=VL("MinWage",1);
-    v[5]=V("MinWage");
-    v[6]=v[3]/v[2]-1; //compute the growth rate of priceEN
-    v[7]=v[5]/v[4]-1; //compute the growth rate of MinWage
-    v[20]=V("psi_spe");
-    v[10]=v[1]*(1+(v[6]-v[7])*v[20]);   //INTERACT("start v10",v[10]);
-    if((v[10]+v[0]+V("KShareEngiProd"))>1 || v[10]<0)
-    	{
-    	v[10]=1-v[0]-V("KShareEngiProd");
-    	  //INTERACT("if v10",v[10]);
-    	}
-    	
-    WRITE("KShareEngiEff",v[10]);
-    WRITE("KShareEngiProd",1-v[0]-v[10]);
-    WRITE("KShareGreenKProd",0);
-    //INTERACT("KSpeF",v[1]);
-    }
-  }
-if (V("KShareEngiProductionEff")+V("KShareEngiEff")+V("KShareEngiProd")+V("KShareGreenKProd")!=1)
-  INTERACT("end Sum of share != 1",v[1]);
-  
-if (V("KShareEngiProductionEff")>1 || V("KShareEngiProductionEff")<0)
-  INTERACT("KShareEngiProductionEff out",v[1]);
-  
-if (V("KShareEngiEff")>1 || V("KShareEngiEff")<0)
-  INTERACT("KShareEngiEff out",v[1]);
-  
-if (V("KShareEngiProd")>1 || V("KShareEngiProd")<0)
-  INTERACT("KShareEngiProd out",v[1]);
-  
-if (V("KShareGreenKProd")>1 || V("KShareGreenKProd")<0)
-  INTERACT("KShareGreenKProd out",v[1]);
-  
-RESULT(1 )
-  
 
 
 
@@ -1855,7 +2027,6 @@ EQUATION("KNbrGreenKProd")
 /*
 Defines the number of engineers working on solar panel productivity
 */
-VL("KSpecialization",1);
 v[0]=VL("KNbrEngineers",1);
 v[1]=V("KShareGreenKProd");
 v[2]=v[0]*v[1];
@@ -1942,21 +2113,6 @@ RESULT(v[2] )
 
 
 
-EQUATION("KGreenSpe") // Called by KFirm
-/*
-Define if the KFirm is specialized in greenK if its green energy cost is below average
-*/
-
-cur=SEARCHS(p->up->up,"Country");
-v[0]=VS(cur,"AvGreenProductivity");
-v[1]=V("GreenProductivity");
-//if(v[1]<=v[0] && V("KNbrGreenKProd")>0)
-if(v[1]>=v[0])
-	v[2]=1;
-else
-	v[2]=0;
-
-RESULT(v[2] )
 
 
 
@@ -1983,64 +2139,6 @@ RESULT(v[2] )
 
 
 
-
-EQUATION("AvSpe") // Called by Country
-/*
- Compute the average energy cost to produce green energy of specialized KFirms
- */
-v[0]=v[1]=v[2]=v[3]=v[10]=v[11]=v[20]=v[21]=v[22]=v[30]=v[31]=v[32]=v[40]=v[41]=v[42]=0;
-CYCLE(cur,"KFirm")
-{
-  V("KGreenSpe"); // make sure KFirms that can access the market are above average
-  if(VS(cur,"KGreenSpe")==1 )
-  {
-    v[1]=VS(cur,"GreenEnergyCost");
-    v[20]=VS(cur,"GreenProductivity");
-    v[30]=VS(cur,"KPrice");
-    v[40]=VS(cur,"MaxENProduction");
-    
-    // begin consistency check
-    cur1=SEARCHS(cur,"KCapital");
-    v[10]=VS(cur1,"GreenEnergyCost");
-    if(v[1]!=v[10])
-    {INTERACT("consistency issue GreenEnergyCost",v[10]);}
-    v[11]=VS(cur1,"GreenProductivity");
-    if(v[20]!=v[11]){INTERACT("consistency issue GreenProductivity",v[11]);}
-    v[12]=VS(cur1,"KPrice");
-    if(v[30]!=v[12]){INTERACT("consistency issue KPrice",v[12]);}
-    v[13]=VS(cur1,"MaxENProduction");
-    if(v[40]!=v[13]){INTERACT("consistency issue MaxENProduction",v[13]);}
-    // end consistency check
-    
-    v[0]=v[0]+v[1]; // sum of energy cost
-    v[21]=v[21]+v[20]; // sum of green productivity
-    v[31]=v[31]+v[30]; // sum of KPrice
-    v[41]=v[41]+v[40]; // sum of MaxENProduction
-    v[2]=v[2]+1; // number of specialised firms
-  }  
-}
-
-if(v[2]==0)
-{
-  INTERACT("zero spe KFirm ",v[2]); // check if there is at least one specilised firm
-  //END_EQUATION(666 );
-}
-else
-{
-  v[3]=v[0]/v[2];
-  v[22]=v[21]/v[2];
-  v[32]=v[31]/v[2];
-  v[42]=v[41]/v[2];
-  v[52]=v[51]/v[2];
-}
-WRITE("AvGreenEnergyCostSpe",v[3]);
-WRITE("AvGreenProductivitySpe",v[22]);
-WRITE("AvGreenKPriceSpe",v[32]);
-WRITE("AvMaxENProduction",v[42]);
-WRITE("NbrGreenKInno",v[2]);
-
-RESULT(1 )
-  
   
   
   
@@ -2051,13 +2149,6 @@ RESULT(1 )
 
 
 
-EQUATION("AvGreenProductivity") // Called by Country
-/*
-	Compute the average green productivity
-*/
-v[0]=AVE("GreenProductivity");
-
-RESULT(v[0] )
 
 
 
@@ -2088,15 +2179,7 @@ RESULT(v[0] )
 
 
 
-EQUATION("NbrKGreenSpe") // Called by Country
-/*
-*/
 
-v[0]=SUM("KGreenSpe");
-if(v[0]<1)
-	INTERACT("zero KGreenSpe",v[0]);
-
-RESULT(v[0] )
 
 
 
@@ -2228,86 +2311,6 @@ RESULT(v[4] )
 
 
 
-
-EQUATION("GreenGrade") // Called by 
-/*
-Comment   
-*/
-
-
-// Build an index to distribute demand across KFirms
-v[50]=v[51]=v[52]=v[90]=0;
-
-
-// Use CYCLE to compute averages
-CYCLE(cur1,"KFirm")
-{
-  //sprintf(msg, "\n IdKFirm %g", VS(cur1,"IdKFirm") ); plog(msg);
-  if(cur1==NULL)
-    INTERACT("cur NULL",v[50]);
-  cur=SEARCHS(cur1,"KCapital");
-  if(cur==NULL)
-    INTERACT("cur NULL",v[40]);
-  v[5]=VS(cur1,"KGreenSpe");
-  if(v[5]==1)
-  {
-    v[40]=VS(cur,"GreenProductivity");
-    //sprintf(msg, "\n GreenProductivity %g", v[40] ); plog(msg);
-    
-    v[50]=v[50]+v[40];
-    v[41]=VS(cur1,"KPrice");
-    //sprintf(msg, "\n KPrice %g", v[41] ); plog(msg);
-    v[51]=v[51]+v[41];
-    v[42]=VS(cur1,"WaitTime");	
-    v[52]=v[52]+v[42];
-    v[90]++;
-  }
-}
-
-v[80]=v[50]/v[90]; // Av GreenProductivity           
-v[81]=v[51]/v[90]; // Av KPrice
-v[82]=v[52]/v[90]; // Av WaitTime
-//sprintf(msg, "\n Av GreenProductivity %g", v[80] ); plog(msg);
-
-
-  v[5]=V("KGreenSpe");
-  if(v[5]==1)
-  {
-    //sprintf(msg, "\n IdKFirm %g", VS(cur1,"IdKFirm") ); plog(msg);
-    
-    //cur=SEARCH("KCapital");
-    //v[40]=VS(cur,"GreenProductivity");
-    
-    // Test without search
-    v[40]=V("GreenProductivity");
-    
-    //sprintf(msg, "\n GreenProductivity %g", v[40] ); plog(msg);
-    v[41]=V("KPrice");
-    //sprintf(msg, "\n KPrice %g", v[41] ); plog(msg);
-    v[42]=V("WaitTime");	
-    //sprintf(msg, "\n WaiTime %g", v[42] ); plog(msg);
-    
-    v[60]=v[40]/v[80]; // Normalize GreenProductivity 
-    //sprintf(msg, "\n Normalized green producitivity %g", v[60] ); plog(msg);
-    v[61]=v[41]/v[81]; // Normalize KPrice
-    //sprintf(msg, "\n Normalized KPrice %g", v[61] ); plog(msg);
-    v[62]=v[42]/v[82]; // Normalize WaitTime
-    //sprintf(msg, "\n Normalized time %g", v[62] ); plog(msg);
-    v[70]=pow(v[60],0.33333)*pow(v[61],-0.33333)*pow(v[62],-0.33333); //grade of KFirms /!\ pow(v[xx],1/3) always return 1.
-    //sprintf(msg, "\n test %g", pow(v[60],(0.33333)) ); plog(msg);
-    
-    v[0]=v[70];
-    //WRITES(cur1,"GreenGrade",v[70]);
-    //sprintf(msg, "\n GreenGrade %g", v[70] ); plog(msg);
-  }
-  else
-  {
-    v[0]=0;
-    //WRITES(cur1,"GreenGrade",0);
-  }
-
-  RESULT(v[0] )
-    
 
 
 
