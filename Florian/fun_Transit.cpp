@@ -9,7 +9,6 @@ EQUATION("AvENPrice")
 /*
 Average production price of GreenF and BrownF (used to distribute demand)
 */
-
 v[0]=SUM("GreenENPrice");
 v[1]=SUM("BrownENPrice");
 v[2]=COUNT("GreenF");
@@ -61,7 +60,6 @@ EQUATION("NbrENFirms")
 /*
 Sum of GreenF and BrownF
 */
-
 v[0]=V("NbrGreenF");
 v[1]=V("NbrBrownF");
 
@@ -76,7 +74,7 @@ A grade that indicate relative position of energy producers regading price, ener
 v[0]=V("betaENPrice");
 v[1]=V("betaENType");
 v[2]=V("GreenENPrice");
-v[3]=V("AvGreenENPrice");
+v[3]=V("AvENPrice");
 v[4]=V("NbrENFirms");
 v[5]=v[2]/v[3]; // Normalize price
 v[6]=pow(v[5],v[0])*pow(1,v[1]); // 1 is for green energy (0.5 for brown)
@@ -92,10 +90,10 @@ A grade that indicate relative position of energy producers regading price, ener
 v[0]=V("betaENPrice");
 v[1]=V("betaENType");
 v[2]=V("BrownENPrice");
-v[3]=V("AvGreenENPrice");
+v[3]=V("AvENPrice");
 v[4]=V("NbrENFirms");
 v[5]=v[2]/v[3]; // Normalize price
-v[6]=pow(v[5],v[0])*pow(0.5,v[1]); // 0.5 is for brown energy 1( for green)
+v[6]=pow(v[5],v[0])*pow(0.5,v[1]); // 0.5 is for brown energy (1 for green)
 
 RESULT(v[6] )
 
@@ -105,7 +103,6 @@ EQUATION("SumENGrade")
 /*
 Sum of ENGreenGrade and ENBrownGrade
 */
-
 v[0]=SUM("ENGreenGrade");
 v[1]=SUM("ENBrownGrade");
 
@@ -117,7 +114,6 @@ EQUATION("GreenFShare")
 /*
 Share of energy demanded to a a GreenF
 */
-
 v[0]=V("ENGreenGrade");
 v[1]=V("SumENGrade");
 
@@ -129,7 +125,6 @@ EQUATION("BrownFShare")
 /*
 Share of energy demanded to a a BrownF
 */
-
 v[0]=V("ENBrownGrade");
 v[1]=V("SumENGrade");
 
@@ -141,7 +136,6 @@ EQUATION("ControlEnergyShare")
 /*
 check if sum of shares is equal to one
 */
-
 v[0]=SUM("GreenFShare");
 //INTERACT("GreenFShare", v[0]);
 v[1]=SUM("BrownFShare");
@@ -149,9 +143,9 @@ v[1]=SUM("BrownFShare");
 v[2]=v[0]+v[1];
 //INTERACT("v2", v[2]);
 
-//if(v[2] != 1 )
-if(v[2] > -10 && v[2] < 10 )
+if( abs(v[2]-1)>0.00001)
 	{
+	LOG("\n%lf", v[2]);
 	INTERACT("Sum of energy share != 1", v[2]);
 	}
 RESULT(v[2] )
@@ -162,7 +156,6 @@ EQUATION("GreenFProd")
 /*
 Energy production of an individual GreenF
 */
-
 v[0]=V("GreenFShare");
 v[1]=V("TotEnergyConsumption");
 
@@ -174,7 +167,6 @@ EQUATION("BrownFProd")
 /*
 Energy production of an individual GreenF
 */
-
 v[0]=V("BrownFShare");
 v[1]=V("TotEnergyConsumption");
 
@@ -186,10 +178,663 @@ EQUATION("GreenEN")
 /*
 compute green energy produced
 */
-
 v[0]=SUM("GreenFProd");
 
 RESULT(v[0] )
+
+
+
+
+EQUATION("GreenKProductionFlow")
+/*
+ 
+*/
+
+//sprintf(msg, "\n GreenKProductionFlow %g", v[0] ); plog(msg);
+
+
+//Activity of the K producing firm
+v[0]=V("GreenKQ"); //production capacity of the firm
+v[1]=V("NumGreenOrders");
+if(v[1]==0)
+  END_EQUATION(0);
+v[2]=v[0]/v[1]; //one way to determine the amount of K production capacity per order. Otherwise...
+
+v[3]=0;
+CYCLE(cur, "GreenOrder")
+{
+  v[4]=VS(cur,"GreenKAmount");
+  v[5]=VS(cur,"GreenKCompletion");
+  v[3]+=v[4]-v[5];
+//sprintf(msg, "\n GreenKCompletion %g", v[5] ); plog(msg);
+
+}
+cur5=SEARCH("BankGreenK");
+WRITES(cur5,"GreenKRevenues",0);
+
+CYCLE_SAFE(cur, "GreenOrder")
+{//increase the level of advancement of the orders and, if completed, remove the order. Given the production capacity, devote it respecting oreders' order (first comes first go, which allows to respect the priority given by customers, on side, and to reduce the dofferences between the price agreed upon ordering and the price at which the kapital is sold)
+  v[4]=VS(cur,"GreenKAmount");
+//sprintf(msg, "\n GreenKAmount %g", v[4] ); plog(msg);
+  v[5]=VS(cur,"GreenKCompletion");
+//sprintf(msg, "\n GreenKCompletion %g", v[5] ); plog(msg);
+  v[6]=(v[4]-v[5]); // given the missing quantity of the current order
+  //v[7]=v[6]*v[0]; //share of production capacity devoted to this order
+  v[8]=min(v[0], v[4]-v[5]); //use the production capacity needed actually neded to produce the order, or exhaust here the production capacity (for the current period)
+//sprintf(msg, "\n v8 %g", v[8] ); plog(msg);
+
+  INCRS(cur,"GreenKCompletion",v[8]);
+  v[0]=v[0]-v[8];
+  v[5]=VS(cur,"GreenKCompletion"); //update the completion level  in order to cancel the order if done
+  if(v[5]>=v[4])
+  {//order fulfilled. Either search for the ordering firm, or simply use the hook
+    if(v[5]>0)
+    {//stupid control needed to not be confused by the very initial object
+        if(cur->hook==NULL)
+          INTERACT("hook NULL",v[0]);
+        //        INCRS(cur->hook,"NumK",1); // hook should be the ordering firm
+        //cur1=ADDOBJS(cur->hook,"Capital");
+        //      cur1=cur->hook->add_an_object("Capital");
+        //        if(t>7)
+        //      INTERACTS(cur->hook, "PincoPallo", v[5]);
+        cur1=ADDOBJS(cur->hook,"GreenCapital");
+        WRITELS(cur1,"GreenK",v[5],t);
+        v[9]=VS(cur,"GreenOrderProductivity");
+        WRITELS(cur1,"GreenVintageProductivity",v[9],t);
+        
+        // Incorporate KEfficiency in the vintage produced IncEfficiency
+//        v[90]=VS(cur,"KEfficiency");
+//        WRITELS(cur1,"IncEfficiency",v[90],t);
+        
+        //      v[10]=VS(cur,"KSkillBiais");
+        //      WRITELS(cur1,"IncSkillBiais",v[10],t);
+        WRITELS(cur1,"GreenIncLearningK",0.1,t);
+        WRITELS(cur1,"GreenKAge",0,t);
+        v[11]=VS(cur,"GreenKP");
+        v[12]=v[11]*v[5];
+        WRITELS(cur1,"GreenKExpenditures",v[12], t);
+        WRITES(cur->hook,"GreenWaiting",0); //tell the firms it has the new capital
+        SORTS(cur->hook,"GreenCapital","GreenVintageProductivity", "DOWN");
+        cur5=SEARCHS(cur->hook,"BankGreenF");
+        INCRS(cur5,"DebtGreenF",v[4]*v[11]); //sprintf(msg, " KF(%g)\n", v[4]*v[11]); plog(msg);  
+//        INCRS(cur5->hook,"CapitalDemand",v[4]*v[11]);
+        cur5=SEARCH("BankGreenK");
+        INCRS(cur5,"GreenKRevenues",v[4]*v[11]);
+        
+        //      WRITES(cur1,"ResellPrice",v[11]*V("DiscountUsedK"));
+        
+        v[20]=INCR("NumGreenOrders",-1);
+        if(v[20]>0)
+          DELETE(cur);
+        else
+        {
+          WRITES(cur,"GreenKAmount",0);
+          WRITES(cur,"GreenKCompletion",0);
+          WRITES(cur,"GreenTimeWaited",0);
+          WRITES(cur,"GreenKproductivity",0);
+//          WRITES(cur,"KEfficiency",0);
+          WRITES(cur, "GreenIdClient", -1);
+          cur->hook=NULL; 
+        }
+    }
+  }
+  else
+  {
+    if(v[4]>0)
+      INCRS(cur,"GreenTimeWaited",1); // if orders remain non completed increase the time needed to go through future orders
+  }
+  
+}
+
+v[13]=min(V("GreenKQ"),v[3]);
+v[15]=V("GreenKQ")-v[3];
+v[16]=v[15]-v[0];
+//if(v[15]>0 && v[15]!=v[0])
+//INTERACT("check the correspondence between production and KQ",v[16]);
+//if(v[15]<0 && v[0]!=0)
+//INTERACT("check the correspondence between production and KQ",v[0]);
+
+RESULT(v[13] )
+
+
+
+
+
+
+EQUATION("GreenKQ")
+/*
+Production capacity of GreenKF = Nbr Workers * Labor Productivity
+*/
+
+v[0]=V("GreenKNbrWorkers");
+v[1]=V("GreenKLaborProductivity");
+
+RESULT((v[0]*v[1]) )
+
+
+
+EQUATION("GreenKGrading") // Called by 
+/*
+Build an index to distribute demand across KFirms   
+*/
+
+//sprintf(msg, "\n GreenKGrading %g", v[0] ); plog(msg);
+
+
+v[50]=v[40]=v[70]=v[90]=0;
+// Use CYCLE to compute averages
+CYCLE(cur1,"GreenKF")
+{
+  //sprintf(msg, "\n IdKFirm %g", VS(cur1,"IdKFirm") ); plog(msg);
+  if(cur1==NULL)
+    INTERACT("cur NULL",v[50]);
+  cur=SEARCHS(cur1,"GreenKCapital");
+  if(cur==NULL)
+    INTERACT("cur NULL",v[40]);
+
+  v[40]=VS(cur,"GreenKProductivity");
+  //sprintf(msg, "\n GreenKProductivity %g", v[40] ); plog(msg);
+    
+  v[50]=v[50]+v[40];
+  v[41]=VS(cur1,"GreenKPrice");
+  //sprintf(msg, "\n KPrice %g", v[41] ); plog(msg);
+  v[51]=v[51]+v[41];
+  v[42]=VS(cur1,"GreenWaitTime");	
+  v[52]=v[52]+v[42];
+  v[90]++;
+
+
+v[80]=v[50]/v[90]; // Av GreenKProductivity           
+v[81]=v[51]/v[90]; // Av GreenKPrice
+v[82]=v[52]/v[90]; // Av GreenWaitTime
+//sprintf(msg, "\n Av GreenKProductivity %g", v[80] ); plog(msg);
+    
+    v[60]=v[40]/v[80]; // Normalize GreenKProductivity 
+		//sprintf(msg, "\n Normalized green producitivity %g", v[60] ); plog(msg);
+    v[61]=v[41]/v[81]; // Normalize GreenKPrice
+		//sprintf(msg, "\n Normalized GreenKPrice %g", v[61] ); plog(msg);
+    v[62]=v[42]/v[82]; // Normalize GreenWaitTime
+		//sprintf(msg, "\n Normalized time %g", v[62] ); plog(msg);
+    v[70]=pow(v[60],0.33333)*pow(v[61],-0.33333)*pow(v[62],-0.33333); //grade of KFirms /!\ pow(v[xx],1/3) always return 1.
+    //sprintf(msg, "\n test %g", pow(v[60],(0.33333)) ); plog(msg);
+    
+    v[0]=v[70];
+    WRITES(cur1,"GreenKGrade",v[70]);
+    //sprintf(msg, "\n GreenKGrade %g", v[70] ); plog(msg);
+}  
+
+RESULT(1 )
+
+
+
+
+
+
+
+EQUATION("GreenInvestmentDecision")
+/*
+Place an order of K if you need it and did not place an order as yet
+*/
+
+//sprintf(msg, "\n GreenInvestmentDecision %g", v[0] ); plog(msg);
+
+/*
+v[0]=V("GreenWaiting");
+if(v[0]==1)
+ END_EQUATION(1); //skip the equation if you already placed an order. To be edited to give the possibility to remove a too late order
+//we are here only if there is no pending order
+
+
+v[1]=V("KapitalNeed");
+v[2]=V("AvKPrice");
+
+v[3]=VL("TotalValue",1);
+v[4]=VL("Liquidity",1);
+
+
+if(v[1]>0 && RND<v[4]/v[3] )
+ {
+  V("PlaceOrder");
+  WRITE("Waiting",1);
+ } 
+*/
+
+V("PlaceGreenOrder");
+
+RESULT( 1)
+
+
+
+
+
+EQUATION("PlaceGreenOrder") 
+/*
+Place order of the amount of GreenInvestment
+*/
+
+//sprintf(msg, "\n PlaceGreenOrder %g", v[0] ); plog(msg);
+
+
+V("GreenKGrading");
+
+v[31]=V("GreenInvestment");
+    //sprintf(msg, "\n PlaceGreeeOrder GreenInvestment %g ", v[31] ); plog(msg);
+    // GreenGrade is computed in its own equation now
+cur3=SEARCHS(p->up,"EnergyMachinery");
+if(cur3 == NULL)
+	INTERACT("PlaceGreenOrder cur3 null", v[31]);
+	
+	
+    v[71]=SUMS(cur3,"GreenKGrade"); 
+    
+    //sprintf(msg, "\n Sum GreenKGrade %g", v[71] ); plog(msg);
+
+    
+    CYCLES(p->up,cur1,"GreenKF")
+    {if(cur1==NULL)
+			INTERACT("cur1 null",v[0]);
+
+
+
+      v[75]=VS(cur1,"GreenKGrade");
+		//sprintf(msg, "\n GreenKGrade %g ", v[75] ); plog(msg);
+
+      v[72]=v[75]/v[71]; // Share of GreenInvestment
+		//sprintf(msg, "\n Share of GreenInvestment %g ", v[72] ); plog(msg);
+
+      v[73]=v[72]*v[31]; // GreenKamount
+		//sprintf(msg, "\n GreenKamount %g ", v[73] ); plog(msg);
+
+      //WRITES(cur1,"GreenKAmount",v[73]);
+      
+      // Now, we know the amount of greenK bought to each KFirm, we can place orders
+
+      if(v[73]>0)
+      {
+        if(VS(cur1, "NumGreenOrders")==0)
+          cur2 = SEARCHS(cur1, "GreenOrder");
+        else  
+          cur2=ADDOBJS(cur1,"GreenOrder"); // add a new instance of GreenOrder to GreenKF
+        
+        if(cur2==NULL)
+          INTERACT("cur2 NULL",v[73]);
+        
+        v[1]=VLS(cur1,"GreenKPrice",1);
+        
+        WRITES(cur2,"GreenKAmount",v[73]);
+        //sprintf(msg, "\n PlaceGreeeOrder KAmount %g ", v[73] ); plog(msg);
+        
+        
+        WRITES(cur2,"GreenKCompletion",0);
+        WRITES(cur2,"GreenTimeWaited",1);
+        INCRS(cur1,"NumGreenOrders",1); //cur1 = KFirm
+        
+        //v[2]=VLS(cur,"GreenProductivity",1); //current state of the K art
+        cur=SEARCHS(cur1,"GreenKCapital");
+        if(cur==NULL)
+        	INTERACT("cur1 null PlaceGreenOrder",v[0]);
+        
+        v[2]=VLS(cur1,"GreenKProductivity",1); //current state of the K art
+        
+        WRITES(cur2,"GreenOrderProductivity",v[2]); //tech characteristics of the capital stock order
+        WRITES(cur2,"GreenOrderPrice",v[1]);// write the price of the capital in the period in which it is ordered, and use it to compute the actual expenditure using the `agreed' price.
+        v[3]=VS(c,"IdEnergy");
+        V("CallMinGreenId");
+        
+        v[24]=V("MinGreenId");
+        //sprintf(msg, "\n minGreenId %g", v[24] ); plog(msg);
+        WRITES(cur2,"OrderGreenId",v[24]);
+        v[25]=V("MinGreenAlpha");
+        WRITES(cur2,"OrderGreenAlpha",v[25]);
+        WRITES(cur2,"IdGreenClient",v[3]);
+        
+        cur2->hook=c; //useful to retrieve quickly the energy object
+      }
+    }
+  
+
+RESULT(1 )
+  
+
+
+
+
+
+EQUATION("BrownKProductionFlow")
+/*
+ 
+ */
+
+//sprintf(msg, "\n BrownKProductionFlow %g", v[0] ); plog(msg);
+
+
+//Activity of the K producing firm
+v[0]=V("BrownKQ"); //production capacity of the firm
+v[1]=V("NumBrownOrders");
+if(v[1]==0)
+  END_EQUATION(0);
+v[2]=v[0]/v[1]; //one way to determine the amount of K production capacity per order. Otherwise...
+
+v[3]=0;
+CYCLE(cur, "BrownOrder")
+{
+  v[4]=VS(cur,"BrownKAmount");
+  v[5]=VS(cur,"BrownKCompletion");
+  v[3]+=v[4]-v[5];
+  //sprintf(msg, "\n BrownKCompletion %g", v[5] ); plog(msg);
+  
+}
+cur5=SEARCH("BankBrownK");
+WRITES(cur5,"BrownKRevenues",0);
+
+CYCLE_SAFE(cur, "BrownOrder")
+{//increase the level of advancement of the orders and, if completed, remove the order. Given the production capacity, devote it respecting oreders' order (first comes first go, which allows to respect the priority given by customers, on side, and to reduce the dofferences between the price agreed upon ordering and the price at which the kapital is sold)
+  v[4]=VS(cur,"BrownKAmount");
+  //sprintf(msg, "\n BrownKAmount %g", v[4] ); plog(msg);
+  v[5]=VS(cur,"BrownKCompletion");
+  //sprintf(msg, "\n BrownKCompletion %g", v[5] ); plog(msg);
+  v[6]=(v[4]-v[5]); // given the missing quantity of the current order
+  //v[7]=v[6]*v[0]; //share of production capacity devoted to this order
+  v[8]=min(v[0], v[4]-v[5]); //use the production capacity needed actually neded to produce the order, or exhaust here the production capacity (for the current period)
+  //sprintf(msg, "\n v8 %g", v[8] ); plog(msg);
+  
+  INCRS(cur,"BrownKCompletion",v[8]);
+  v[0]=v[0]-v[8];
+  v[5]=VS(cur,"BrownKCompletion"); //update the completion level  in order to cancel the order if done
+  if(v[5]>=v[4])
+  {//order fulfilled. Either search for the ordering firm, or simply use the hook
+    if(v[5]>0)
+    {//stupid control needed to not be confused by the very initial object
+      if(cur->hook==NULL)
+        INTERACT("hook NULL",v[0]);
+      //        INCRS(cur->hook,"NumK",1); // hook should be the ordering firm
+      //cur1=ADDOBJS(cur->hook,"Capital");
+      //      cur1=cur->hook->add_an_object("Capital");
+      //        if(t>7)
+      //      INTERACTS(cur->hook, "PincoPallo", v[5]);
+      cur1=ADDOBJS(cur->hook,"BrownCapital");
+      WRITELS(cur1,"BrownK",v[5],t);
+      v[9]=VS(cur,"BrownOrderProductivity");
+      WRITELS(cur1,"BrownVintageProductivity",v[9],t);
+      
+      // Incorporate KEfficiency in the vintage produced IncEfficiency
+      //        v[90]=VS(cur,"KEfficiency");
+      //        WRITELS(cur1,"IncEfficiency",v[90],t);
+      
+      //      v[10]=VS(cur,"KSkillBiais");
+      //      WRITELS(cur1,"IncSkillBiais",v[10],t);
+      WRITELS(cur1,"BrownIncLearningK",0.1,t);
+      WRITELS(cur1,"BrownKAge",0,t);
+      v[11]=VS(cur,"BrownKP");
+      v[12]=v[11]*v[5];
+      WRITELS(cur1,"BrownKExpenditures",v[12], t);
+      WRITES(cur->hook,"BrownWaiting",0); //tell the firms it has the new capital
+      SORTS(cur->hook,"BrownCapital","BrownVintageProductivity", "DOWN");
+      cur5=SEARCHS(cur->hook,"BankBrownF");
+      INCRS(cur5,"DebtBrownF",v[4]*v[11]); //sprintf(msg, " KF(%g)\n", v[4]*v[11]); plog(msg);  
+      //        INCRS(cur5->hook,"CapitalDemand",v[4]*v[11]);
+      cur5=SEARCH("BankBrownK");
+      INCRS(cur5,"BrownKRevenues",v[4]*v[11]);
+      
+      //      WRITES(cur1,"ResellPrice",v[11]*V("DiscountUsedK"));
+      
+      v[20]=INCR("NumBrownOrders",-1);
+      if(v[20]>0)
+        DELETE(cur);
+      else
+      {
+        WRITES(cur,"BrownKAmount",0);
+        WRITES(cur,"BrownKCompletion",0);
+        WRITES(cur,"BrownTimeWaited",0);
+        WRITES(cur,"BrownKproductivity",0);
+        //          WRITES(cur,"KEfficiency",0);
+        WRITES(cur, "BrownIdClient", -1);
+        cur->hook=NULL; 
+      }
+    }
+  }
+  else
+  {
+    if(v[4]>0)
+      INCRS(cur,"BrownTimeWaited",1); // if orders remain non completed increase the time needed to go through future orders
+  }
+  
+}
+
+v[13]=min(V("BrownKQ"),v[3]);
+v[15]=V("BrownKQ")-v[3];
+v[16]=v[15]-v[0];
+//if(v[15]>0 && v[15]!=v[0])
+//INTERACT("check the correspondence between production and KQ",v[16]);
+//if(v[15]<0 && v[0]!=0)
+//INTERACT("check the correspondence between production and KQ",v[0]);
+
+RESULT(v[13] )
+  
+  
+  
+  
+  
+  
+  EQUATION("BrownKQ")
+  /*
+   Production capacity of BrownKF = Nbr Workers * Labor Productivity
+   */
+  
+  v[0]=V("BrownKNbrWorkers");
+v[1]=V("BrownKLaborProductivity");
+
+RESULT((v[0]*v[1]) )
+  
+  
+  
+  EQUATION("BrownKGrading") // Called by 
+  /*
+   Build an index to distribute demand across KFirms   
+   */
+  
+  //sprintf(msg, "\n BrownKGrading %g", v[0] ); plog(msg);
+  
+  
+  v[50]=v[40]=v[70]=v[90]=0;
+  // Use CYCLE to compute averages
+  CYCLE(cur1,"BrownKF")
+  {
+    //sprintf(msg, "\n IdKFirm %g", VS(cur1,"IdKFirm") ); plog(msg);
+    if(cur1==NULL)
+      INTERACT("cur NULL",v[50]);
+    cur=SEARCHS(cur1,"BrownKCapital");
+    if(cur==NULL)
+      INTERACT("cur NULL",v[40]);
+    
+    v[40]=VS(cur,"BrownKProductivity");
+    //sprintf(msg, "\n BrownKProductivity %g", v[40] ); plog(msg);
+    
+    v[50]=v[50]+v[40];
+    v[41]=VS(cur1,"BrownKPrice");
+    //sprintf(msg, "\n KPrice %g", v[41] ); plog(msg);
+    v[51]=v[51]+v[41];
+    v[42]=VS(cur1,"BrownWaitTime");	
+    v[52]=v[52]+v[42];
+    v[90]++;
+    
+    
+    v[80]=v[50]/v[90]; // Av BrownKProductivity           
+    v[81]=v[51]/v[90]; // Av BrownKPrice
+    v[82]=v[52]/v[90]; // Av BrownWaitTime
+    //sprintf(msg, "\n Av BrownKProductivity %g", v[80] ); plog(msg);
+    
+    v[60]=v[40]/v[80]; // Normalize BrownKProductivity 
+    //sprintf(msg, "\n Normalized green producitivity %g", v[60] ); plog(msg);
+    v[61]=v[41]/v[81]; // Normalize BrownKPrice
+    //sprintf(msg, "\n Normalized BrownKPrice %g", v[61] ); plog(msg);
+    v[62]=v[42]/v[82]; // Normalize BrownWaitTime
+    //sprintf(msg, "\n Normalized time %g", v[62] ); plog(msg);
+    v[70]=pow(v[60],0.33333)*pow(v[61],-0.33333)*pow(v[62],-0.33333); //grade of KFirms /!\ pow(v[xx],1/3) always return 1.
+    //sprintf(msg, "\n test %g", pow(v[60],(0.33333)) ); plog(msg);
+    
+    v[0]=v[70];
+    WRITES(cur1,"BrownKGrade",v[70]);
+    //sprintf(msg, "\n BrownKGrade %g", v[70] ); plog(msg);
+  }  
+  
+  RESULT(1 )
+    
+    
+    
+    
+    
+    
+    
+    EQUATION("BrownInvestmentDecision")
+    /*
+     Place an order of K if you need it and did not place an order as yet
+     */
+    
+    //sprintf(msg, "\n BrownInvestmentDecision %g", v[0] ); plog(msg);
+    
+    /*
+     v[0]=V("BrownWaiting");
+     if(v[0]==1)
+     END_EQUATION(1); //skip the equation if you already placed an order. To be edited to give the possibility to remove a too late order
+     //we are here only if there is no pending order
+     
+     
+     v[1]=V("KapitalNeed");
+     v[2]=V("AvKPrice");
+     
+     v[3]=VL("TotalValue",1);
+     v[4]=VL("Liquidity",1);
+     
+     
+     if(v[1]>0 && RND<v[4]/v[3] )
+     {
+     V("PlaceOrder");
+     WRITE("Waiting",1);
+     } 
+     */
+    
+    V("PlaceBrownOrder");
+    
+    RESULT( 1)
+      
+      
+      
+      
+      
+      EQUATION("PlaceBrownOrder") 
+      /*
+       Place order of the amount of BrownInvestment
+       */
+      
+      //sprintf(msg, "\n PlaceBrownOrder %g", v[0] ); plog(msg);
+      
+      
+      V("BrownKGrading");
+    
+    v[31]=V("BrownInvestment");
+    //sprintf(msg, "\n PlaceGreeeOrder BrownInvestment %g ", v[31] ); plog(msg);
+    // BrownGrade is computed in its own equation now
+    cur3=SEARCHS(p->up,"EnergyMachinery");
+    if(cur3 == NULL)
+      INTERACT("PlaceBrownOrder cur3 null", v[31]);
+    
+    
+    v[71]=SUMS(cur3,"BrownKGrade"); 
+    
+    //sprintf(msg, "\n Sum BrownKGrade %g", v[71] ); plog(msg);
+    
+    
+    CYCLES(p->up,cur1,"BrownKF")
+    {if(cur1==NULL)
+      INTERACT("cur1 null",v[0]);
+    
+    
+    
+    v[75]=VS(cur1,"BrownKGrade");
+    //sprintf(msg, "\n BrownKGrade %g ", v[75] ); plog(msg);
+    
+    v[72]=v[75]/v[71]; // Share of BrownInvestment
+    //sprintf(msg, "\n Share of BrownInvestment %g ", v[72] ); plog(msg);
+    
+    v[73]=v[72]*v[31]; // BrownKamount
+    //sprintf(msg, "\n BrownKamount %g ", v[73] ); plog(msg);
+    
+    //WRITES(cur1,"BrownKAmount",v[73]);
+    
+    // Now, we know the amount of greenK bought to each KFirm, we can place orders
+    
+    if(v[73]>0)
+    {
+      if(VS(cur1, "NumBrownOrders")==0)
+        cur2 = SEARCHS(cur1, "BrownOrder");
+      else  
+        cur2=ADDOBJS(cur1,"BrownOrder"); // add a new instance of BrownOrder to BrownKF
+      
+      if(cur2==NULL)
+        INTERACT("cur2 NULL",v[73]);
+      
+      v[1]=VLS(cur1,"BrownKPrice",1);
+      
+      WRITES(cur2,"BrownKAmount",v[73]);
+      //sprintf(msg, "\n PlaceGreeeOrder KAmount %g ", v[73] ); plog(msg);
+      
+      
+      WRITES(cur2,"BrownKCompletion",0);
+      WRITES(cur2,"BrownTimeWaited",1);
+      INCRS(cur1,"NumBrownOrders",1); //cur1 = KFirm
+      
+      //v[2]=VLS(cur,"BrownProductivity",1); //current state of the K art
+      cur=SEARCHS(cur1,"BrownKCapital");
+      if(cur==NULL)
+        INTERACT("cur1 null PlaceBrownOrder",v[0]);
+      
+      v[2]=VLS(cur1,"BrownKProductivity",1); //current state of the K art
+      
+      WRITES(cur2,"BrownOrderProductivity",v[2]); //tech characteristics of the capital stock order
+      WRITES(cur2,"BrownOrderPrice",v[1]);// write the price of the capital in the period in which it is ordered, and use it to compute the actual expenditure using the `agreed' price.
+      v[3]=VS(c,"IdEnergy");
+      V("CallMinBrownId");
+      
+      v[24]=V("MinBrownId");
+      //sprintf(msg, "\n minBrownId %g", v[24] ); plog(msg);
+      WRITES(cur2,"OrderBrownId",v[24]);
+      v[25]=V("MinBrownAlpha");
+      WRITES(cur2,"OrderBrownAlpha",v[25]);
+      WRITES(cur2,"IdBrownClient",v[3]);
+      
+      cur2->hook=c; //useful to retrieve quickly the energy object
+    }
+    }
+    
+    
+    RESULT(1 )
+      
+      
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -308,6 +953,285 @@ RESULT(1 )
 
 
 
+EQUATION("PlaceGreenOrder") // Called by energy
+/*
+
+if(V("GreenInvestment")<0.1)
+  END_EQUATION(1); // stop
+
+v[1]=V("AvGreenEnergyCostSpe");
+v[2]=V("OilPrice");
+v[3]=V("OilProd");
+v[4]=v[2]/v[3]; // Unit cost to produce dirty energy
+
+v[5]=V("GreenInvestment"); 
+
+cur2 = SEARCHS( p->up, "Energy" );
+WRITES(cur2, "LocalGreenInvestmentOrder",0);
+
+
+//sprintf(msg, "\n PlaceGreenOrder"); plog(msg); 
+
+
+// local cost < RoW cost 
+  //  sprintf(msg, "\n local %g < RoW %g ", v[1], v[0] ); plog(msg);
+  
+  if(v[1]<v[4] ) // 2. Check if green cheaper than dirty
+  { // if green cheaper than dirty, buy from local 
+    
+    //sprintf(msg, "\n local green %g cheaper than dirty %g", v[1], v[4] );	plog(msg);
+    
+    v[31]=V("GreenInvestment");
+    //sprintf(msg, "\n PlaceGreeeOrder GreenInvestment %g ", v[31] ); plog(msg);
+    // GreenGrade is computed in its own equation now
+    cur3=SEARCHS(p->up,"Machinery");
+    v[71]=SUMS(cur3,"GreenGrade"); 
+    
+    CYCLE(cur1,"KFirm")
+    {
+      v[75]=VS(cur1,"GreenGrade");
+      v[72]=v[75]/v[71]; // Share of GreenInvestment
+      v[73]=v[72]*v[31]; // GreenKamount
+      WRITES(cur1,"GreenKAmount",v[73]);
+      
+      // Now, we know the amount of greenK bought to each KFirm, we can place orders
+
+      if(v[73]>0)
+      {
+        if(VS(cur1, "NumOrders")==0)
+          cur2 = SEARCHS(cur1, "Order");
+        else  
+          cur2=ADDOBJS(cur1,"Order"); // add a new instance of Order to KFirm
+        
+        if(cur2==NULL)
+          INTERACT("cur2 NULL",v[73]);
+        
+        v[1]=VLS(cur1,"KPrice",1);
+        WRITES(cur2,"GreenOrder",1);
+        //WRITES(cur2,"KAmount",v[73]);
+        
+        WRITES(cur2,"KAmount",v[73]);
+        //sprintf(msg, "\n PlaceGreeeOrder KAmount %g ", v[73] ); plog(msg);
+        
+        
+        WRITES(cur2,"KCompletion",0);
+        WRITES(cur2,"TimeWaited",1);
+        INCRS(cur1,"NumOrders",1); //cur1 = KFirm
+        
+        //v[2]=VLS(cur,"GreenProductivity",1); //current state of the K art
+        cur=SEARCHS(cur1,"KCapital");
+        v[2]=VLS(cur,"GreenProductivity",1); //current state of the K art
+        
+        WRITES(cur2,"GreenKProd",v[2]); //tech characteristics of the capital stock order
+        WRITES(cur2,"KP",v[1]);// write the price of the capital in the period in which it is ordered, and use it to compute the actual expenditure using the `agreed' price.
+        v[3]=VS(c,"IdEnergy");
+        V("CallMinGreenId");
+        
+        v[24]=V("MinGreenId");
+        //sprintf(msg, "\n minGreenId %g", v[24] ); plog(msg);
+        WRITES(cur2,"OrderGreenId",v[24]);
+        v[25]=V("MinAlpha");
+        WRITES(cur2,"OrderAlpha",v[25]);
+        WRITES(cur2,"IdClient",v[3]);
+        
+        cur2->hook=c; //useful to retrieve quickly the energy object
+      }
+    }
+  }
+  else
+  {
+    //sprintf(msg, "\n local green %g more expansive than dirty %g", v[1], v[4] ); plog(msg);
+    END_EQUATION(1); // stop   	
+  }
+  
+
+ */
+RESULT(1 )
+
+
+
+
+EQUATION("AvSpe") // Called by Country
+/*
+ Compute the average energy cost to produce green energy of specialized KFirms
+
+v[0]=v[1]=v[2]=v[3]=v[10]=v[11]=v[20]=v[21]=v[22]=v[30]=v[31]=v[32]=v[40]=v[41]=v[42]=0;
+CYCLE(cur,"KFirm")
+{
+  V("KGreenSpe"); // make sure KFirms that can access the market are above average
+  if(VS(cur,"KGreenSpe")==1 )
+  {
+    v[1]=VS(cur,"GreenEnergyCost");
+    v[20]=VS(cur,"GreenProductivity");
+    v[30]=VS(cur,"KPrice");
+    v[40]=VS(cur,"MaxENProduction");
+    
+    // begin consistency check
+    cur1=SEARCHS(cur,"KCapital");
+    v[10]=VS(cur1,"GreenEnergyCost");
+    if(v[1]!=v[10])
+    {INTERACT("consistency issue GreenEnergyCost",v[10]);}
+    v[11]=VS(cur1,"GreenProductivity");
+    if(v[20]!=v[11]){INTERACT("consistency issue GreenProductivity",v[11]);}
+    v[12]=VS(cur1,"KPrice");
+    if(v[30]!=v[12]){INTERACT("consistency issue KPrice",v[12]);}
+    v[13]=VS(cur1,"MaxENProduction");
+    if(v[40]!=v[13]){INTERACT("consistency issue MaxENProduction",v[13]);}
+    // end consistency check
+    
+    v[0]=v[0]+v[1]; // sum of energy cost
+    v[21]=v[21]+v[20]; // sum of green productivity
+    v[31]=v[31]+v[30]; // sum of KPrice
+    v[41]=v[41]+v[40]; // sum of MaxENProduction
+    v[2]=v[2]+1; // number of specialised firms
+  }  
+}
+
+if(v[2]==0)
+{
+  INTERACT("zero spe KFirm ",v[2]); // check if there is at least one specilised firm
+  //END_EQUATION(666 );
+}
+else
+{
+  v[3]=v[0]/v[2];
+  v[22]=v[21]/v[2];
+  v[32]=v[31]/v[2];
+  v[42]=v[41]/v[2];
+  v[52]=v[51]/v[2];
+}
+WRITE("AvGreenEnergyCostSpe",v[3]);
+WRITE("AvGreenProductivitySpe",v[22]);
+WRITE("AvGreenKPriceSpe",v[32]);
+WRITE("AvMaxENProduction",v[42]);
+WRITE("NbrGreenKInno",v[2]);
+
+ */
+RESULT(1 )
+
+
+
+
+EQUATION("ProbToSwitch")
+/*
+  Comment 
+
+  
+//v[0]=VS(p->up,"MoAvGreenInvestmentGr");
+//INTERACT("MoAvGreenInvestmentGr",v[0]);
+
+//v[1]=VS(p->up,"MoAvInvestmentGr");
+//INTERACT("MoAvInvestmentGr",v[1]);
+
+v[0]=V("MoAvGreenInvestment");
+v[1]=VL("MoAvGreenInvestment",1);
+if(v[1]==0)
+	v[1]=1;
+	
+v[2]=VL("NbrGreenKInno",1);
+if(v[2]==0)
+	v[2]=1;
+
+v[3]=(v[0]/v[1]-1)/v[2]; // weighted growth rate of MoAvGreenInvestment
+
+v[4]=V("MoAvInvestment");
+v[5]=VL("MoAvInvestment",1);
+if(v[5]==0)
+	v[5]=0.0001;
+	
+v[6]=COUNT("KFirm")-VL("NbrGreenKInno",1);
+if(v[6]==0)
+	v[6]=1;
+
+v[7]=(v[4]/v[5]-1)/v[6]; // weighted growth rate of MoAvInvestment
+
+
+if(V("KShareGreenKProd")==0)
+  { // the kfirm currently focuses its R&D on final good firms
+  v[10]=(v[7]-v[3]);
+  if(v[10]>0) //if investment grows faster than green inv, there is no reason to switch
+  	v[10]=0;
+  }
+else
+  { // the kfirm currently focuses its R&D on energy productivity of solar panels
+  v[10]=(v[3]-v[7]);
+  if(v[10]>0) //investment grows faster than green inv, there is no reason to switch
+  	v[10]=0;
+  }
+//INTERACT("v2",v[2]);
+
+v[20]=1-exp(v[10]); // proba to switch specialization
+
+*/
+RESULT(v[20] )
+
+
+
+
+EQUATION("KSpecialization")
+/*
+Comment 
+
+
+  if (V("KShareEngiProductionEff")+V("KShareEngiEff")+V("KShareEngiProd")+V("KShareGreenKProd")!=1)
+  { 
+  INTERACT("start Sum of share != 1",v[1]);
+  }
+  
+v[0]=V("KShareEngiProductionEff");
+v[1]=V("KShareEngiEff");
+
+if(RND<V("ProbToSwitch"))
+  {
+  if(V("KShareGreenKProd")==0)
+    { // the kfirm currently focuses its R&D on final good firms and wants to switch
+    WRITE("KShareEngiEff",0);
+    WRITE("KShareEngiProd",0);
+    WRITE("KShareGreenKProd",1-v[0]);
+    //INTERACT("KSpeE",v[1]);
+
+    }
+  else
+    { // the kfirm currently focuses its R&D on energy productivity of solar panels and wants to switch
+    v[2]=VL("priceEN",1);
+    v[3]=V("priceEN");
+    v[4]=VL("MinWage",1);
+    v[5]=V("MinWage");
+    v[6]=v[3]/v[2]-1; //compute the growth rate of priceEN
+    v[7]=v[5]/v[4]-1; //compute the growth rate of MinWage
+    v[20]=V("psi_spe");
+    v[10]=v[1]*(1+(v[6]-v[7])*v[20]);   //INTERACT("start v10",v[10]);
+    if((v[10]+v[0]+V("KShareEngiProd"))>1 || v[10]<0)
+    	{
+    	v[10]=1-v[0]-V("KShareEngiProd");
+    	  //INTERACT("if v10",v[10]);
+    	}
+    	
+    WRITE("KShareEngiEff",v[10]);
+    WRITE("KShareEngiProd",1-v[0]-v[10]);
+    WRITE("KShareGreenKProd",0);
+    //INTERACT("KSpeF",v[1]);
+    }
+  }
+if (V("KShareEngiProductionEff")+V("KShareEngiEff")+V("KShareEngiProd")+V("KShareGreenKProd")!=1)
+  INTERACT("end Sum of share != 1",v[1]);
+  
+if (V("KShareEngiProductionEff")>1 || V("KShareEngiProductionEff")<0)
+  INTERACT("KShareEngiProductionEff out",v[1]);
+  
+if (V("KShareEngiEff")>1 || V("KShareEngiEff")<0)
+  INTERACT("KShareEngiEff out",v[1]);
+  
+if (V("KShareEngiProd")>1 || V("KShareEngiProd")<0)
+  INTERACT("KShareEngiProd out",v[1]);
+  
+if (V("KShareGreenKProd")>1 || V("KShareGreenKProd")<0)
+  INTERACT("KShareGreenKProd out",v[1]);
+
+*/
+
+RESULT(1 )
+  
 
 
 
@@ -318,6 +1242,156 @@ RESULT(1 )
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+EQUATION("KProductionFlow")
+/*
+ 
+ */
+//Activity of the K producing firm
+v[0]=V("KQ"); //production capacity of the firm
+v[1]=V("NumOrders");
+if(v[1]==0)
+  END_EQUATION(0);
+v[2]=v[0]/v[1]; //one way to determine the amount of K production capacity per order. Otherwise...
+
+v[3]=0;
+CYCLE(cur, "Order")
+{
+  v[4]=VS(cur,"KAmount");
+  v[5]=VS(cur,"KCompletion");
+  v[3]+=v[4]-v[5];
+}
+cur5=SEARCH("BankK");
+WRITES(cur5,"KRevenues",0);
+
+CYCLE_SAFE(cur, "Order")
+{//increase the level of advancement of the orders and, if completed, remove the order. Given the production capacity, devote it respecting oreders' order (first comes first go, which allows to respect the priority given by customers, on side, and to reduce the dofferences between the price agreed upon ordering and the price at which the kapital is sold)
+  v[4]=VS(cur,"KAmount");
+  v[5]=VS(cur,"KCompletion");
+  v[6]=(v[4]-v[5]); // given the missing quantity of the current order
+  //v[7]=v[6]*v[0]; //share of production capacity devoted to this order
+  v[8]=min(v[0], v[4]-v[5]); //use the production capacity needed actually neded to produce the order, or exhaust here the production capacity (for the current period)
+  INCRS(cur,"KCompletion",v[8]);
+  v[0]=v[0]-v[8];
+  v[5]=VS(cur,"KCompletion"); //update the completion level  in order to cancel the order if done
+  if(v[5]>=v[4])
+  {//order fulfilled. Either search for the ordering firm, or simply use the hook
+    if(v[5]>0)
+    {//stupid control needed to not be confused by the very initial object
+        if(cur->hook==NULL)
+          INTERACT("hook NULL",v[0]);
+        //        INCRS(cur->hook,"NumK",1); // hook should be the ordering firm
+        //cur1=ADDOBJS(cur->hook,"Capital");
+        //      cur1=cur->hook->add_an_object("Capital");
+        //        if(t>7)
+        //      INTERACTS(cur->hook, "PincoPallo", v[5]);
+        cur1=ADDOBJS(cur->hook,"Capital");
+        WRITELS(cur1,"K",v[5],t);
+        v[9]=VS(cur,"Kproductivity");
+        WRITELS(cur1,"IncProductivity",v[9],t);
+        
+        // Incorporate KEfficiency in the vintage produced IncEfficiency
+        v[90]=VS(cur,"KEfficiency");
+        WRITELS(cur1,"IncEfficiency",v[90],t);
+        
+        //      v[10]=VS(cur,"KSkillBiais");
+        //      WRITELS(cur1,"IncSkillBiais",v[10],t);
+        WRITELS(cur1,"IncLearningK",0.1,t);
+        WRITELS(cur1,"KAge",0,t);
+        v[11]=VS(cur,"KP");
+        v[12]=v[11]*v[5];
+        WRITELS(cur1,"KExpenditures",v[12], t);
+        WRITES(cur->hook,"Waiting",0); //tell the firms it has the new capital
+        SORTS(cur->hook,"Capital","IncProductivity", "DOWN");
+        cur5=SEARCHS(cur->hook,"BankF");
+        INCRS(cur5,"DebtF",v[4]*v[11]); //sprintf(msg, " KF(%g)\n", v[4]*v[11]); plog(msg);  
+        INCRS(cur5->hook,"CapitalDemand",v[4]*v[11]);
+        cur5=SEARCH("BankK");
+        INCRS(cur5,"KRevenues",v[4]*v[11]);
+        
+        //      WRITES(cur1,"ResellPrice",v[11]*V("DiscountUsedK"));
+        
+        v[20]=INCR("NumOrders",-1);
+        if(v[20]>0)
+          DELETE(cur);
+        else
+        {
+          WRITES(cur,"KAmount",0);
+          WRITES(cur,"KCompletion",0);
+          WRITES(cur,"TimeWaited",0);
+          WRITES(cur,"Kproductivity",0);
+          WRITES(cur,"KEfficiency",0);
+          WRITES(cur, "IdClient", -1);
+          cur->hook=NULL; 
+        }
+    }
+  }
+  else
+  {
+    if(v[4]>0)
+      INCRS(cur,"TimeWaited",1); // if orders remain non completed increase the time needed to go through future orders
+  }
+  
+}
+
+v[13]=min(V("KQ"),v[3]);
+v[15]=V("KQ")-v[3];
+v[16]=v[15]-v[0];
+//if(v[15]>0 && v[15]!=v[0])
+//INTERACT("check the correspondence between production and KQ",v[16]);
+//if(v[15]<0 && v[0]!=0)
+//INTERACT("check the correspondence between production and KQ",v[0]);
+
+RESULT(v[13] )
+  
+  
 
 
 
@@ -952,7 +2026,6 @@ EQUATION("KNbrEngiProd")
 /*
 Defines the number of engineers working on productivity
 */
-V("KSpecialization");
 
 v[0]=VL("KNbrEngineers",1);
 v[1]=V("KShareEngiProd");
@@ -964,7 +2037,6 @@ EQUATION("KNbrEngiEff")
 /*
 Defines the number of engineers working on efficiency
 */
-V("KSpecialization");
 
 v[0]=VL("KNbrEngineers",1);
 v[1]=V("KShareEngiEff");
@@ -976,7 +2048,6 @@ EQUATION("KNbrEngiProductionEff")
 /*
 Defines the number of engineers working on process efficiency
 */
-V("KSpecialization");
 
 v[0]=VL("KNbrEngineers",1);
 v[1]=V("KShareEngiProductionEff");
@@ -1203,57 +2274,6 @@ v[4]= 0.99*v[3]+0.11*v[2];  // MoAvMinWageGr
 
 RESULT(v[4] )
 
-EQUATION("ProbToSwitch")
-/*
-  Comment 
-*/
-  
-//v[0]=VS(p->up,"MoAvGreenInvestmentGr");
-//INTERACT("MoAvGreenInvestmentGr",v[0]);
-
-//v[1]=VS(p->up,"MoAvInvestmentGr");
-//INTERACT("MoAvInvestmentGr",v[1]);
-
-v[0]=V("MoAvGreenInvestment");
-v[1]=VL("MoAvGreenInvestment",1);
-if(v[1]==0)
-	v[1]=1;
-	
-v[2]=VL("NbrGreenKInno",1);
-if(v[2]==0)
-	v[2]=1;
-
-v[3]=(v[0]/v[1]-1)/v[2]; // weighted growth rate of MoAvGreenInvestment
-
-v[4]=V("MoAvInvestment");
-v[5]=VL("MoAvInvestment",1);
-if(v[5]==0)
-	v[5]=0.0001;
-	
-v[6]=COUNT("KFirm")-VL("NbrGreenKInno",1);
-if(v[6]==0)
-	v[6]=1;
-
-v[7]=(v[4]/v[5]-1)/v[6]; // weighted growth rate of MoAvInvestment
-
-
-if(V("KShareGreenKProd")==0)
-  { // the kfirm currently focuses its R&D on final good firms
-  v[10]=(v[7]-v[3]);
-  if(v[10]>0) //if investment grows faster than green inv, there is no reason to switch
-  	v[10]=0;
-  }
-else
-  { // the kfirm currently focuses its R&D on energy productivity of solar panels
-  v[10]=(v[3]-v[7]);
-  if(v[10]>0) //investment grows faster than green inv, there is no reason to switch
-  	v[10]=0;
-  }
-//INTERACT("v2",v[2]);
-
-v[20]=1-exp(v[10]); // proba to switch specialization
-
-RESULT(v[20] )
 
 
 
@@ -1275,69 +2295,6 @@ RESULT(v[20] )
 
 
 
-
-
-EQUATION("KSpecialization")
-/*
-Comment 
-*/
-  if (V("KShareEngiProductionEff")+V("KShareEngiEff")+V("KShareEngiProd")+V("KShareGreenKProd")!=1)
-  { 
-  INTERACT("start Sum of share != 1",v[1]);
-  }
-  
-v[0]=V("KShareEngiProductionEff");
-v[1]=V("KShareEngiEff");
-
-if(RND<V("ProbToSwitch"))
-  {
-  if(V("KShareGreenKProd")==0)
-    { // the kfirm currently focuses its R&D on final good firms and wants to switch
-    WRITE("KShareEngiEff",0);
-    WRITE("KShareEngiProd",0);
-    WRITE("KShareGreenKProd",1-v[0]);
-    //INTERACT("KSpeE",v[1]);
-
-    }
-  else
-    { // the kfirm currently focuses its R&D on energy productivity of solar panels and wants to switch
-    v[2]=VL("priceEN",1);
-    v[3]=V("priceEN");
-    v[4]=VL("MinWage",1);
-    v[5]=V("MinWage");
-    v[6]=v[3]/v[2]-1; //compute the growth rate of priceEN
-    v[7]=v[5]/v[4]-1; //compute the growth rate of MinWage
-    v[20]=V("psi_spe");
-    v[10]=v[1]*(1+(v[6]-v[7])*v[20]);   //INTERACT("start v10",v[10]);
-    if((v[10]+v[0]+V("KShareEngiProd"))>1 || v[10]<0)
-    	{
-    	v[10]=1-v[0]-V("KShareEngiProd");
-    	  //INTERACT("if v10",v[10]);
-    	}
-    	
-    WRITE("KShareEngiEff",v[10]);
-    WRITE("KShareEngiProd",1-v[0]-v[10]);
-    WRITE("KShareGreenKProd",0);
-    //INTERACT("KSpeF",v[1]);
-    }
-  }
-if (V("KShareEngiProductionEff")+V("KShareEngiEff")+V("KShareEngiProd")+V("KShareGreenKProd")!=1)
-  INTERACT("end Sum of share != 1",v[1]);
-  
-if (V("KShareEngiProductionEff")>1 || V("KShareEngiProductionEff")<0)
-  INTERACT("KShareEngiProductionEff out",v[1]);
-  
-if (V("KShareEngiEff")>1 || V("KShareEngiEff")<0)
-  INTERACT("KShareEngiEff out",v[1]);
-  
-if (V("KShareEngiProd")>1 || V("KShareEngiProd")<0)
-  INTERACT("KShareEngiProd out",v[1]);
-  
-if (V("KShareGreenKProd")>1 || V("KShareGreenKProd")<0)
-  INTERACT("KShareGreenKProd out",v[1]);
-  
-RESULT(1 )
-  
 
 
 
@@ -1364,7 +2321,6 @@ EQUATION("KNbrGreenKProd")
 /*
 Defines the number of engineers working on solar panel productivity
 */
-VL("KSpecialization",1);
 v[0]=VL("KNbrEngineers",1);
 v[1]=V("KShareGreenKProd");
 v[2]=v[0]*v[1];
@@ -1417,7 +2373,7 @@ compute green energy produced by a green vintage
 */
 
 v[0]=V("GreenK");
-v[1]=V("GreenIncProductivity");
+v[1]=V("GreenVintageProductivity");
 v[2]=V("GreenKAge");
 v[3]=V("GreenCapitalDep");
 v[4]=V("alpha");
@@ -1451,21 +2407,6 @@ RESULT(v[2] )
 
 
 
-EQUATION("KGreenSpe") // Called by KFirm
-/*
-Define if the KFirm is specialized in greenK if its green energy cost is below average
-*/
-
-cur=SEARCHS(p->up->up,"Country");
-v[0]=VS(cur,"AvGreenProductivity");
-v[1]=V("GreenProductivity");
-//if(v[1]<=v[0] && V("KNbrGreenKProd")>0)
-if(v[1]>=v[0])
-	v[2]=1;
-else
-	v[2]=0;
-
-RESULT(v[2] )
 
 
 
@@ -1492,64 +2433,6 @@ RESULT(v[2] )
 
 
 
-
-EQUATION("AvSpe") // Called by Country
-/*
- Compute the average energy cost to produce green energy of specialized KFirms
- */
-v[0]=v[1]=v[2]=v[3]=v[10]=v[11]=v[20]=v[21]=v[22]=v[30]=v[31]=v[32]=v[40]=v[41]=v[42]=0;
-CYCLE(cur,"KFirm")
-{
-  V("KGreenSpe"); // make sure KFirms that can access the market are above average
-  if(VS(cur,"KGreenSpe")==1 )
-  {
-    v[1]=VS(cur,"GreenEnergyCost");
-    v[20]=VS(cur,"GreenProductivity");
-    v[30]=VS(cur,"KPrice");
-    v[40]=VS(cur,"MaxENProduction");
-    
-    // begin consistency check
-    cur1=SEARCHS(cur,"KCapital");
-    v[10]=VS(cur1,"GreenEnergyCost");
-    if(v[1]!=v[10])
-    {INTERACT("consistency issue GreenEnergyCost",v[10]);}
-    v[11]=VS(cur1,"GreenProductivity");
-    if(v[20]!=v[11]){INTERACT("consistency issue GreenProductivity",v[11]);}
-    v[12]=VS(cur1,"KPrice");
-    if(v[30]!=v[12]){INTERACT("consistency issue KPrice",v[12]);}
-    v[13]=VS(cur1,"MaxENProduction");
-    if(v[40]!=v[13]){INTERACT("consistency issue MaxENProduction",v[13]);}
-    // end consistency check
-    
-    v[0]=v[0]+v[1]; // sum of energy cost
-    v[21]=v[21]+v[20]; // sum of green productivity
-    v[31]=v[31]+v[30]; // sum of KPrice
-    v[41]=v[41]+v[40]; // sum of MaxENProduction
-    v[2]=v[2]+1; // number of specialised firms
-  }  
-}
-
-if(v[2]==0)
-{
-  INTERACT("zero spe KFirm ",v[2]); // check if there is at least one specilised firm
-  //END_EQUATION(666 );
-}
-else
-{
-  v[3]=v[0]/v[2];
-  v[22]=v[21]/v[2];
-  v[32]=v[31]/v[2];
-  v[42]=v[41]/v[2];
-  v[52]=v[51]/v[2];
-}
-WRITE("AvGreenEnergyCostSpe",v[3]);
-WRITE("AvGreenProductivitySpe",v[22]);
-WRITE("AvGreenKPriceSpe",v[32]);
-WRITE("AvMaxENProduction",v[42]);
-WRITE("NbrGreenKInno",v[2]);
-
-RESULT(1 )
-  
   
   
   
@@ -1560,13 +2443,6 @@ RESULT(1 )
 
 
 
-EQUATION("AvGreenProductivity") // Called by Country
-/*
-	Compute the average green productivity
-*/
-v[0]=AVE("GreenProductivity");
-
-RESULT(v[0] )
 
 
 
@@ -1597,15 +2473,7 @@ RESULT(v[0] )
 
 
 
-EQUATION("NbrKGreenSpe") // Called by Country
-/*
-*/
 
-v[0]=SUM("KGreenSpe");
-if(v[0]<1)
-	INTERACT("zero KGreenSpe",v[0]);
-
-RESULT(v[0] )
 
 
 
@@ -1664,101 +2532,6 @@ RESULT(v[4] )
 
 
 
-EQUATION("PlaceGreenOrder") // Called by energy
-/*
- */
-if(V("GreenInvestment")<0.1)
-  END_EQUATION(1); // stop
-
-v[1]=V("AvGreenEnergyCostSpe");
-v[2]=V("OilPrice");
-v[3]=V("OilProd");
-v[4]=v[2]/v[3]; // Unit cost to produce dirty energy
-
-v[5]=V("GreenInvestment"); 
-
-cur2 = SEARCHS( p->up, "Energy" );
-WRITES(cur2, "LocalGreenInvestmentOrder",0);
-
-
-//sprintf(msg, "\n PlaceGreenOrder"); plog(msg); 
-
-
-// local cost < RoW cost 
-  //  sprintf(msg, "\n local %g < RoW %g ", v[1], v[0] ); plog(msg);
-  
-  if(v[1]<v[4] ) // 2. Check if green cheaper than dirty
-  { // if green cheaper than dirty, buy from local 
-    
-    //sprintf(msg, "\n local green %g cheaper than dirty %g", v[1], v[4] );	plog(msg);
-    
-    v[31]=V("GreenInvestment");
-    //sprintf(msg, "\n PlaceGreeeOrder GreenInvestment %g ", v[31] ); plog(msg);
-    // GreenGrade is computed in its own equation now
-    cur3=SEARCHS(p->up,"Machinery");
-    v[71]=SUMS(cur3,"GreenGrade"); 
-    
-    CYCLE(cur1,"KFirm")
-    {
-      v[75]=VS(cur1,"GreenGrade");
-      v[72]=v[75]/v[71]; // Share of GreenInvestment
-      v[73]=v[72]*v[31]; // GreenKamount
-      WRITES(cur1,"GreenKAmount",v[73]);
-      
-      // Now, we know the amount of greenK bought to each KFirm, we can place orders
-
-      if(v[73]>0)
-      {
-        if(VS(cur1, "NumOrders")==0)
-          cur2 = SEARCHS(cur1, "Order");
-        else  
-          cur2=ADDOBJS(cur1,"Order"); // add a new instance of Order to KFirm
-        
-        if(cur2==NULL)
-          INTERACT("cur2 NULL",v[73]);
-        
-        v[1]=VLS(cur1,"KPrice",1);
-        WRITES(cur2,"GreenOrder",1);
-        //WRITES(cur2,"KAmount",v[73]);
-        
-        WRITES(cur2,"KAmount",v[73]);
-        //sprintf(msg, "\n PlaceGreeeOrder KAmount %g ", v[73] ); plog(msg);
-        
-        
-        WRITES(cur2,"KCompletion",0);
-        WRITES(cur2,"TimeWaited",1);
-        INCRS(cur1,"NumOrders",1); //cur1 = KFirm
-        
-        //v[2]=VLS(cur,"GreenProductivity",1); //current state of the K art
-        cur=SEARCHS(cur1,"KCapital");
-        v[2]=VLS(cur,"GreenProductivity",1); //current state of the K art
-        
-        WRITES(cur2,"GreenKProd",v[2]); //tech characteristics of the capital stock order
-        WRITES(cur2,"KP",v[1]);// write the price of the capital in the period in which it is ordered, and use it to compute the actual expenditure using the `agreed' price.
-        v[3]=VS(c,"IdEnergy");
-        V("CallMinGreenId");
-        
-        v[24]=V("MinGreenId");
-        //sprintf(msg, "\n minGreenId %g", v[24] ); plog(msg);
-        WRITES(cur2,"OrderGreenId",v[24]);
-        v[25]=V("MinAlpha");
-        WRITES(cur2,"OrderAlpha",v[25]);
-        WRITES(cur2,"IdClient",v[3]);
-        
-        cur2->hook=c; //useful to retrieve quickly the energy object
-      }
-    }
-  }
-  else
-  {
-    //sprintf(msg, "\n local green %g more expansive than dirty %g", v[1], v[4] ); plog(msg);
-    END_EQUATION(1); // stop   	
-  }
-  
-
-
-RESULT(1 )
-  
   
   
     
@@ -1833,86 +2606,6 @@ RESULT(1 )
 
 
 
-EQUATION("GreenGrade") // Called by 
-/*
-Comment   
-*/
-
-
-// Build an index to distribute demand across KFirms
-v[50]=v[51]=v[52]=v[90]=0;
-
-
-// Use CYCLE to compute averages
-CYCLE(cur1,"KFirm")
-{
-  //sprintf(msg, "\n IdKFirm %g", VS(cur1,"IdKFirm") ); plog(msg);
-  if(cur1==NULL)
-    INTERACT("cur NULL",v[50]);
-  cur=SEARCHS(cur1,"KCapital");
-  if(cur==NULL)
-    INTERACT("cur NULL",v[40]);
-  v[5]=VS(cur1,"KGreenSpe");
-  if(v[5]==1)
-  {
-    v[40]=VS(cur,"GreenProductivity");
-    //sprintf(msg, "\n GreenProductivity %g", v[40] ); plog(msg);
-    
-    v[50]=v[50]+v[40];
-    v[41]=VS(cur1,"KPrice");
-    //sprintf(msg, "\n KPrice %g", v[41] ); plog(msg);
-    v[51]=v[51]+v[41];
-    v[42]=VS(cur1,"WaitTime");	
-    v[52]=v[52]+v[42];
-    v[90]++;
-  }
-}
-
-v[80]=v[50]/v[90]; // Av GreenProductivity           
-v[81]=v[51]/v[90]; // Av KPrice
-v[82]=v[52]/v[90]; // Av WaitTime
-//sprintf(msg, "\n Av GreenProductivity %g", v[80] ); plog(msg);
-
-
-  v[5]=V("KGreenSpe");
-  if(v[5]==1)
-  {
-    //sprintf(msg, "\n IdKFirm %g", VS(cur1,"IdKFirm") ); plog(msg);
-    
-    //cur=SEARCH("KCapital");
-    //v[40]=VS(cur,"GreenProductivity");
-    
-    // Test without search
-    v[40]=V("GreenProductivity");
-    
-    //sprintf(msg, "\n GreenProductivity %g", v[40] ); plog(msg);
-    v[41]=V("KPrice");
-    //sprintf(msg, "\n KPrice %g", v[41] ); plog(msg);
-    v[42]=V("WaitTime");	
-    //sprintf(msg, "\n WaiTime %g", v[42] ); plog(msg);
-    
-    v[60]=v[40]/v[80]; // Normalize GreenProductivity 
-    //sprintf(msg, "\n Normalized green producitivity %g", v[60] ); plog(msg);
-    v[61]=v[41]/v[81]; // Normalize KPrice
-    //sprintf(msg, "\n Normalized KPrice %g", v[61] ); plog(msg);
-    v[62]=v[42]/v[82]; // Normalize WaitTime
-    //sprintf(msg, "\n Normalized time %g", v[62] ); plog(msg);
-    v[70]=pow(v[60],0.33333)*pow(v[61],-0.33333)*pow(v[62],-0.33333); //grade of KFirms /!\ pow(v[xx],1/3) always return 1.
-    //sprintf(msg, "\n test %g", pow(v[60],(0.33333)) ); plog(msg);
-    
-    v[0]=v[70];
-    //WRITES(cur1,"GreenGrade",v[70]);
-    //sprintf(msg, "\n GreenGrade %g", v[70] ); plog(msg);
-  }
-  else
-  {
-    v[0]=0;
-    //WRITES(cur1,"GreenGrade",0);
-  }
-
-  RESULT(v[0] )
-    
-
 
 
 
@@ -1954,218 +2647,6 @@ v[82]=v[52]/v[90]; // Av WaitTime
 
 
 
-EQUATION("KProductionFlow")
-/*
- 
- */
-
-cur6=SEARCHS(p->up->up,"Energy"); 
-if(cur6==NULL)
-  INTERACT("cur6 NULL",1);
-//WRITES(cur6,"LocalGreenInvestment",0);
-
-//Activity of the K producing firm
-v[0]=V("KQ"); //production capacity of the firm
-v[1]=V("NumOrders");
-if(v[1]==0)
-  END_EQUATION(0);
-v[2]=v[0]/v[1]; //one way to determine the amount of K production capacity per order. Otherwise...
-
-v[3]=0;
-CYCLE(cur, "Order")
-{
-  v[4]=VS(cur,"KAmount");
-  v[5]=VS(cur,"KCompletion");
-  v[3]+=v[4]-v[5];
-}
-cur5=SEARCH("BankK");
-WRITES(cur5,"KRevenues",0);
-
-CYCLE_SAFE(cur, "Order")
-{//increase the level of advancement of the orders and, if completed, remove the order. Given the production capacity, devote it respecting oreders' order (first comes first go, which allows to respect the priority given by customers, on side, and to reduce the dofferences between the price agreed upon ordering and the price at which the kapital is sold)
-  v[4]=VS(cur,"KAmount");
-  v[5]=VS(cur,"KCompletion");
-  v[6]=(v[4]-v[5]); // given the missing quantity of the current order
-  //v[7]=v[6]*v[0]; //share of production capacity devoted to this order
-  v[8]=min(v[0], v[4]-v[5]); //use the production capacity needed actually neded to produce the order, or exhaust here the production capacity (for the current period)
-  INCRS(cur,"KCompletion",v[8]);
-  v[0]=v[0]-v[8];
-  v[5]=VS(cur,"KCompletion"); //update the completion level  in order to cancel the order if done
-  if(v[5]>=v[4])
-  {//order fulfilled. Either search for the ordering firm, or simply use the hook
-    if(v[5]>0)
-    {//stupid control needed to not be confused by the very initial object
-      if(VS(cur,"GreenOrder")==1)
-      {// Order is a GreenOrder
-        
-        V("CallMinGreenId");
-        // Check is minGreenId < MAX(GreenId) to know if there is an available location
-        v[30]=VS(cur,"MinGreenId");
-        //sprintf(msg, "\n MinGreenId %g", v[30]); plog(msg);  
-        v[31]=MAX("GreenId");
-        //sprintf(msg, "\n MAX GreenId %g", v[31]); plog(msg);  
-        v[32]=VS(cur,"MinAlpha");
-        
-        if(v[30]<v[31])
-        {// if there is a free GreenId (GreenK=0), place here the new green vintage
-          cur1=SEARCH_CND("GreenId", v[30]);
-          //sprintf(msg, "there is a free GreenId (GreenK=0)", v[31]); plog(msg);
-        }
-        else
-        {// if there is no free GreenId (GreenK != 0), create a new Id
-          cur1=ADDOBJS(cur->hook,"GreenCapital");
-          //sprintf(msg, "there is no free GreenId (GreenK != 0)", v[31]); plog(msg);
-          WRITES(cur1,"GreenId",v[30]+1);
-        }
-        WRITES(cur1,"alpha",v[32]);
-        WRITELS(cur1,"GreenK",v[5],t);
-        v[9]=VS(cur,"GreenKProd");
-        WRITELS(cur1,"GreenIncProductivity",v[9],t);
-        
-        WRITELS(cur1,"GreenKAge",0,t);
-        v[11]=VS(cur,"KP");
-        WRITELS(cur1,"GreenKPrice",v[11], t);
-        v[12]=v[11]*v[5];
-        WRITELS(cur1,"GreenKExpenditures",v[12], t);
-        
-        
-        v[50]=min(v[0],v[3]);
-        
-         //sprintf(msg, "\n KQ %lf", v[0] ); plog(msg);
-         //sprintf(msg, "\n v3 %lf", v[3] ); plog(msg);
-				
-				
-        WRITES(cur->up,"LocalGreenInvestment",v[50]);
-        //INCRS(cur6,"TotLocalGreenInvestment",v[50]);
-        
-         //sprintf(msg, "\n LocalGreenInvestment %lf", v[50] ); plog(msg);
-
-        
-        //			cur2=SEARCHS(p->up->up,"Energy");
-        //sprintf(msg, "\n GreenId %lf", v[30] ); plog(msg);
-        
-        
-        v[14]=V("GreenCapitalDep");
-        v[15]=V("MaxGreenKAge");
-        
-        //v[13]=((v[32]*v[9]*((1-v[14])-pow(1-v[14],v[15]+1) )/v[14]))/v[11]; // Computes ActualGreenEnergyCost
-        v[13]=v[11]/(v[32]*v[9]*((1-v[14])-pow(1-v[14],v[15]+1) )/v[14]); // Computes ActualGreenEnergyCost
-        
-        
-        //INTERACT("GreenEnergyCost",v[13]);
-//sprintf(msg, "\n GreenEnergyCostKProductionFlow %lf", v[13] ); plog(msg);
-        WRITELS(cur1,"ActualGreenEnergyCost",v[13],t);
-        
-        
-        WRITES(cur->hook,"EWaiting",0); //tell the firms it has the new capital
-        cur5=SEARCHS(cur->hook,"BankE");
-        INCRS(cur5,"BalanceE",-v[4]*v[11]); //sprintf(msg, " KF(%g)\n", v[4]*v[11]); plog(msg);  
-        cur4=SEARCH("BankK");
-        INCRS(cur4,"KRevenues",v[4]*v[11]);
-        
-        cur3=SEARCHS(p->up->up, "Bank");
-        if(cur3==NULL)
-          INTERACT("MERDE CUR3", v[15]);
-        INCRS(cur3,"CapitalDemand",v[4]*v[11]);
-        
-        ////      WRITES(cur1,"ResellPrice",v[11]*V("DiscountUsedK"));
-        
-        v[20]=INCR("NumOrders",-1);
-        //if(v[20]<=0)
-        //INTERACTS(cur, "Ponco", v[20]);
-        if(v[20]>0)
-          DELETE(cur);
-        else
-        {
-          WRITES(cur,"KAmount",0);
-          WRITES(cur,"KCompletion",0);
-          WRITES(cur,"TimeWaited",0);
-          WRITES(cur,"Kproductivity",0);
-          WRITES(cur,"KEfficiency",0); 
-          WRITES(cur, "IdClient", -1);
-          cur->hook=NULL;
-          
-        }
-      }
-      else
-      {// Order is not a GreenOrder
-        
-        if(cur->hook==NULL)
-          INTERACT("hook NULL",v[0]);
-        
-        //INTERACT("stop",v[0]);
-        
-        
-        //        INCRS(cur->hook,"NumK",1); // hook should be the ordering firm
-        //cur1=ADDOBJS(cur->hook,"Capital");
-        //      cur1=cur->hook->add_an_object("Capital");
-        //        if(t>7)
-        //      INTERACTS(cur->hook, "PincoPallo", v[5]);
-        cur1=ADDOBJS(cur->hook,"Capital");
-        WRITELS(cur1,"K",v[5],t);
-        v[9]=VS(cur,"Kproductivity");
-        WRITELS(cur1,"IncProductivity",v[9],t);
-        
-        // Incorporate KEfficiency in the vintage produced IncEfficiency
-        v[90]=VS(cur,"KEfficiency");
-        WRITELS(cur1,"IncEfficiency",v[90],t);
-        
-        //      v[10]=VS(cur,"KSkillBiais");
-        //      WRITELS(cur1,"IncSkillBiais",v[10],t);
-        WRITELS(cur1,"IncLearningK",0.1,t);
-        WRITELS(cur1,"KAge",0,t);
-        v[11]=VS(cur,"KP");
-        v[12]=v[11]*v[5];
-        WRITELS(cur1,"KExpenditures",v[12], t);
-        WRITES(cur->hook,"Waiting",0); //tell the firms it has the new capital
-        SORTS(cur->hook,"Capital","IncProductivity", "DOWN");
-        cur5=SEARCHS(cur->hook,"BankF");
-        INCRS(cur5,"DebtF",v[4]*v[11]); //sprintf(msg, " KF(%g)\n", v[4]*v[11]); plog(msg);  
-        INCRS(cur5->hook,"CapitalDemand",v[4]*v[11]);
-        cur5=SEARCH("BankK");
-        INCRS(cur5,"KRevenues",v[4]*v[11]);
-        
-        //      WRITES(cur1,"ResellPrice",v[11]*V("DiscountUsedK"));
-        
-        v[20]=INCR("NumOrders",-1);
-        if(v[20]>0)
-          DELETE(cur);
-        else
-        {
-          WRITES(cur,"KAmount",0);
-          WRITES(cur,"KCompletion",0);
-          WRITES(cur,"TimeWaited",0);
-          WRITES(cur,"Kproductivity",0);
-          WRITES(cur,"KEfficiency",0);
-          WRITES(cur, "IdClient", -1);
-          cur->hook=NULL;
-          
-        }
-      }
-    }
-  }
-  else
-  {
-    if(v[4]>0)
-      INCRS(cur,"TimeWaited",1); // if orders remain non completed increase the time needed to go through future orders
-  }
-  
-}
-
-v[13]=min(V("KQ"),v[3]);
-v[15]=V("KQ")-v[3];
-v[16]=v[15]-v[0];
-//if(v[15]>0 && v[15]!=v[0])
-//INTERACT("check the correspondence between production and KQ",v[16]);
-//if(v[15]<0 && v[0]!=0)
-//INTERACT("check the correspondence between production and KQ",v[0]);
-
-
-
-
-RESULT(v[13] )
-  
-  
   
 
 
@@ -2503,8 +2984,20 @@ v[50]=V("AvMaxEfficiency");
 WRITELS(cur4,"IncEfficiency",v[50],t);
 
 
-cur5=SEARCHS(cur1,"blItem");
-WRITES(cur5,"blPrice",0.5*V("AvPrice"));
+//cur5=SEARCHS(cur1,"blItem");
+//WRITES(cur5,"blPrice",0.5*V("AvPrice"));
+
+WRITES(cur1, "numBLI", 0);
+
+v[44]=0;
+CYCLE_SAFES(cur1, cur, "blItem")
+{
+	if(v[44]==1)
+	DELETE(cur);
+	else
+	WRITES(cur, "blQ", 0); 
+	v[44]=1;
+}
 
 
 
@@ -4925,7 +5418,7 @@ CYCLE(cur, "KFirm")
       else	
         cur1=ADDOBJS(cur,"Order");
       
-      WRITES(cur1,"GreenOrder",0);
+      //WRITES(cur1,"GreenOrder",0); Useless in the transit model
       
       //if(v[44]<v[3]*v[6])
       //v[63]=v[44]/v[6]; //REMOVED THE RATIONING DUE TO INSUFFICIENT NETWORTH

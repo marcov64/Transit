@@ -5,72 +5,92 @@ MODELBEGIN
 EQUATION("AvActualGreenEnergyCost")
 /*
 Weighted average of green energy cost
+
+AvActualGreenEnergyCost = Suma / GreenEN
 */
 v[0]=V("Suma");
 v[1]=V("GreenEN");
+
 RESULT(v[0]/v[1] )
+
+
 
 EQUATION("Suma")
 /*
 Sum of "a" used to compute the weighted average of green energy AvActualGreenEnergyCost
+
+Suma = a + a + a +...
 */
 v[0]=SUM("a");
+
 RESULT(v[0] )
+
+
 
 EQUATION("a")
 /*
 Used to compute the weighted average of green energy AvActualGreenEnergyCost
+
+a = ActualGreenEnergyCost / GreenVintageEN
 */
 v[0]=V("ActualGreenEnergyCost");
 v[1]=V("GreenVintageEN");
+
 RESULT(v[0]*v[1] )
 
 
-EQUATION("ENGDP")
+
+EQUATION("ENGDP") // 
 /*
+Compute energy consumption as a proportion of GDP (actually total output xxx)
 */
 v[1]=V("TotEnergyConsumption");
-v[2]=V("GdpConstant");
+v[2]=V("GdpConstant"); // 												GdpConstant = accumulated(revenues) + accumulated(KProductionFlow * KPrice) + TotEnergyConsumption
+
 RESULT(v[1]/v[2] )
 
 
 
 EQUATION("PriceENGr")
 /*
+Compute the growth rate of energy price
+
+PriceENGr = (priceEN / priceEN(t-1) ) - 1
 */
 v[2]=VL("priceEN",1);
 v[3]=V("priceEN");
-v[6]=v[3]/v[2]-1; //compute the growth rate of priceEN
+v[6]=v[3]/v[2]-1; //															growth rate of priceEN
+
 RESULT(v[6] )
 
 
 
 EQUATION("MinWageGr")
 /*
+Compute the growth rate of minimum wage
+
+MinWageGr = (MinWageGr / MinWageGr(t-1) ) -1
 */
 v[4]=VL("MinWage",1);
 v[5]=V("MinWage");
-v[7]=v[5]/v[4]-1; //compute the growth rate of MinWage
+v[7]=v[5]/v[4]-1; //															growth rate of MinWage
+
 RESULT(v[7] )
 
 
 
 EQUATION("GreenEnergyPriceProd")  // Called by KCapital
 /*
-Compute the investment cost to produce one unit of green energy during the whole life of the vintage. 
+Computes the investment cost to produce one unit of green energy during the whole life of the vintage.
+
+GreenEnergyPriceProd = KPrice / GreenProductivity
 */
-
 cur1=SEARCHS(p->up,"KFirm");
-
 v[0]=VS(cur1,"KPrice");
-
 // INTERACT("KPrice",v[0]);
-
 v[1]=V("GreenProductivity"); 
-
 // INTERACT("MaxENProduction",v[1]);
-
-v[2]=v[0]/v[1];
+v[2]=v[0]/v[1]; // 												GreenEnergyPriceProd = KPrice / GreenProductivity
 
 RESULT(v[2] )
 
@@ -78,6 +98,9 @@ RESULT(v[2] )
 
 EQUATION("VacanciesRatio")
 /*
+Computes the ratio of Vacancies to total Vacancies
+
+VacanciesRatio = Vacancies / TotVacancies
 */
 v[0]=V("Vacancies");
 v[1]=V("TotVacancies");
@@ -88,6 +111,9 @@ RESULT(v[0]/v[1] )
 
 EQUATION("LaborForceRatio")
 /*
+Compute the rato of labour force to total labour force
+
+LaborForceRatio = LaborForce / TotLaborForce
 */
 v[0]=V("LaborForce");
 v[1]=V("TotLaborForce");
@@ -98,44 +124,49 @@ RESULT(v[0]/v[1] )
 
 EQUATION("aNW")
 /*
+Computes the measure of labour market rigidity that allows firms to reach the desired level of workers asymptotically over time
+
+aNW = aaNW * log(Vacancies)
+max value aNW can take is 1
 */
 //v[0]=VL("MaxLaborProductivity",1);
 //v[1]=VL("Q",1);
 //v[2]=v[1]-v[0];
-
 //if(v[2]<0)
 //	v[2]=0;
 	
 v[3]=V("aaNW");
-
 v[4]=V("Vacancies");
-
 if(v[4]<1)
 	v[4]=1;
-
-v[5]=v[3]*log(v[4]);
+v[5]=v[3]*log(v[4]); //										v[5] = aaNW *log(Vacancies)
 if(v[5]>1)
-	v[5]=1;
+	v[5]=1; //															max value aNW can take is 1
 
 //v[6]=VL("aNW",1);
 //INTERACT("aNW 1", v[6]);
 //v[7]=0.1*v[5]+0.9*v[6];
-
-//RESULT(v[3]*log(v[2]+1) ) 
+//RESULT(v[3]*log(v[2]+1) )
+ 
 RESULT(v[5] ) 
 
 
 
 EQUATION("ENNominal")
 /*
+ENNominal = priceEN * TotIncome
 */
 v[0]=V("priceEN");
 v[1]=V("TotIncome");
 
 RESULT(v[0]*v[1] )
 
+
+
 EQUATION("ENGDPRatio")
 /*
+ENGDPRatio = priceEN * (TotIncome/GdpNominal)
+(xxx GdpNominal actually total nominal output)
 */
 v[0]=V("priceEN");
 v[1]=V("TotIncome");
@@ -147,95 +178,147 @@ RESULT(v[0]*v[1]/v[2] )
 
 EQUATION("TotQ")
 /*
+computes total output 
 */
 v[0]=SUM("Q");
 
 RESULT(v[0] )
 
+
+
 EQUATION("TotUnitDemand")
 /*
+computes total units demanded
+
+TotUnitDemand = UnitDemand + UnitDemand + UnitDemand ...
 */
 v[0]=SUM("UnitDemand");
 
 RESULT(v[0] )
 
+
+
 EQUATION("AvMarkup")
 /*
+computes average markup
 */
 v[0]=AVE("markup");
 
 RESULT(v[0] )
 
+
+
 EQUATION("TotKNbrWorkers")
 /*
+computes total number of workers in the capital sector firms
+
+TotKNbrWorkers = KNbrWorkers + KNbrWorkers + KNbrWorkers ...
 */
 v[0]=SUM("KNbrWorkers");
 
 RESULT(v[0] )
 
+
+
 EQUATION("TotKLaborForce")
 /*
+computes total capital sector labour force 
+
+TotKLaborForce = KLaborForce + KLaborForce + KLaborForce ... 
+xxx check - should it not be: v[0]=SUM("KLaborForce")
 */
 v[0]=SUM("LaborForce");
 
 RESULT(v[0] )
+
+
 
 EQUATION("TotLaborForce")
 /*
+computes total final goods labour force 
+
+TotKLaborForce = LaborForce + LaborForce + LaborForce ... 
 */
 v[0]=SUM("LaborForce");
 
 RESULT(v[0] )
 
+
+
 EQUATION("AvMaxLaborProductivity")
 /*
+compute the average of MaxLaborProductivity
 */
 v[0]=AVE("MaxLaborProductivity");
 
 RESULT(v[0] )
 
+
+
 EQUATION("TotBacklog")
 /*
+compute the total backlogs
+
+TotBacklog = Backlog + Backlog + Backlog ...
 */
 v[0]=SUM("backlog");
 
 RESULT(v[0] )
 
+
+
 EQUATION("AvDiffCapacity")
 /*
+compute the average of DiffCapacity (difference between capital and labor capacity)
 */
 v[0]=AVE("DiffCapacity");
 
 RESULT(v[0] )
 
+
+
 EQUATION("DiffCapacity")
 /*
-Count the number of firm waiting for their new capital
+Compute difference between capital and labor capacity
+
+DiffCapacity = CapitalCapacity - LaborCapacity
 */
 v[0]=V("CapitalCapacity");
 v[1]=V("LaborCapacity");
 
 RESULT(v[0]-v[1] )
 
+
+
 EQUATION("TotKAmount")
 /*
+Sum of KAmount
+
+xxx TotKAmount doesn’t appear in LSD browser, despite being in LMM
 */
 v[0]=SUM("KAmount");
 
 RESULT(v[0] )
 
 
+
 EQUATION("NbrFirms")
 /*
-Count the number of firm waiting for their new capital
+Count the number (Nbr) of firms in the model
+
+NbrFirms = Firm + Firm + Firm ...
 */
 v[0]=COUNT("Firm");
 
 RESULT(v[0] )
 
+
+
 EQUATION("NbrNotWaiting")
 /*
-Count the number of firm waiting for their new capital
+Count the number (Nbr) of firms NOT waiting for their new capital
+
+NbrNotWaiting = COUNT("Firm") - SUM("Waiting")
 */
 v[0]=SUM("Waiting");
 v[1]=COUNT("Firm");
@@ -244,28 +327,38 @@ v[2]=v[1]-v[0];
 RESULT(v[2] )
 
 
+
 EQUATION("NbrWaiting")
 /*
-Count the number of firm waiting for their new capital
+Count the number of firms waiting for their new capital
+
+NbrWaiting = Waiting + Waiting + Waiting ...
 */
 v[0]=SUM("Waiting");
 
 RESULT(v[0] )
 
 
+
 EQUATION("NbrOrders")
 /*
+Count the number of orders of new capital 
+
+NbrOrder = Order + Order + Order ...
 */
 v[0]=COUNT("Order");
 
 RESULT(v[0] )
 
 
+
 EQUATION("DirtyEN")
 /*
 compute dirty energy produced as a residual
-*/
 
+DirtyEN = TotEnergyConsumption - GreenEN
+if: TotEnergyConsumption > GreenEN; otherwise = 0
+*/
 v[0]=V("TotEnergyConsumption");
 v[1]=V("GreenEN");
 
@@ -278,27 +371,38 @@ else
 
 RESULT(v[2] )
 
+
+
 EQUATION("OilUse")
 /*
 compute amount of oil used to produce energy
-*/
 
+OilUse = DirtyEN / OilProd
+*/
 v[0]=V("DirtyEN");
 v[1]=V("OilProd");
 
 RESULT(v[0]/v[1] )
 
 
+
 EQUATION("OilProduction")
 /*
+equal to OilUse
+
+xxx never used, remove?
 */
 v[1]=V("OilUse");
 
 RESULT(v[1] )
 
 
+
 EQUATION("OilPrice")
 /*
+computes exogenous oil price increase
+
+OilPrice = OilPrice(t-1) * (1 + OilPriceGrowth)
 */
 v[0]=VL("OilPrice",1);
 v[1]=V("OilPriceGrowth");
@@ -307,39 +411,23 @@ RESULT(v[0]*(1+v[1]) )
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 EQUATION("NbrEngiGreen")
 /*
+computes number of engineers working on green productivity 
+
+NbrEngiGreen = KNbrGreenKProd + KNbrGreenKProd + KNbrGreenKProd ...
 */
 v[0]=SUM("KNbrGreenKProd");
 
 RESULT(v[0] )
 
 
+
 EQUATION("TotInvestment")
 /*
+computes total investment
+
+TotInvestment = KProductionFlow + KProductionFlow + KProductionFlow ...
 */
 v[0]=SUM("KProductionFlow");
 
@@ -349,6 +437,9 @@ RESULT(v[0] )
 
 EQUATION("AvLocalPriceProd")
 /*
+Ratio of average capital price to average capital productivity
+
+AvLocalPriceProd = AvKPrice / AvCurrProd
 */
 v[0]=V("AvKPrice");
 v[1]=V("AvCurrProd");
@@ -357,21 +448,24 @@ RESULT(v[0]/v[1] )
 
 
 
-
-
-
-
-
 EQUATION("GreenENShare")
-/*
+/* 
+Green energy share
+
+GreenENShare = GreenEN / TotEnergyConsumption
 */
 v[0]=V("GreenEN");
 v[1]=V("TotEnergyConsumption");
 
 RESULT(v[0]/v[1] )
 
+
+
 EQUATION("DirtyENShare")
 /*
+Brown energy share
+
+DirtyENShare = DirtyEN / TotEnergyConsumption
 */
 v[0]=V("DirtyEN");
 v[1]=V("TotEnergyConsumption");
@@ -382,7 +476,9 @@ RESULT(v[0]/v[1] )
 
 EQUATION("TotENCost")
 /*
-Compute the cost to produce energy with both Green and Oil
+Compute the cost of green and brown energy per unit of energy output. xxx same as priceEN
+
+TotENCost = (GreenEN * AvActualGreenEnergyCost + OilUse * OilPrice) / TotEnergyConsumption
 */
 v[0]=v[1]=v[2]=v[3]=v[4]=0;
 v[0]=V("GreenEN");
@@ -398,18 +494,28 @@ v[6]=(v[0]*v[1]+v[2]*v[3])/(v[5]);
 RESULT(v[6] )
 
 
+
 EQUATION("priceEN")
 /*
+Compute the price of green and brown energy. xxx same as TotENCost
 */
 //v[0]=VS(p->up,"TotENCost");
 v[0]=V("TotENCost");
 //INTERACT("TotENCost /g",v[0]);
+
 RESULT(v[0] )
+
 
 
 EQUATION("MaxEnergyEfficiency")
 /*
-Defines the Theoretical Energy Efficiency of the Firm as incorporated in the various capital vintages of the firm.
+Defines the Theoretical Energy Efficiency of the Firm as incorporated in the various capital vintages of the firm. (xxx isn't this the average capital efficiency?)
+
+MaxEnergyEfficiency = (Acumulation[remainingK] * IncEfficiency ] / Acumulation(remainingK)
+
+remainingK = v[7] = v[3]*v[6] = K * ((1 - CapitalDepress)^KAge 
+
+Accumulation(K * IncEfficiency)
 */
 
 v[10]=V("CapitalStock");
@@ -432,17 +538,25 @@ v[8]=v[0]/v[1];//Max Energy Efficiency computed as the weighted average of the i
 
 RESULT(v[8] )
 
+
+
 EQUATION("EN")
 /*
 Compute the energy used by final good firms
+
+EN = Q / MaxEnergyEfficiency
 */
 v[0]=V("Q");
 v[1]=V("MaxEnergyEfficiency");
 RESULT(v[0]/v[1] )
 
+
+
 EQUATION("UnitEnergyCost")
 /*
-comment
+Compute the energy cost to produce one final good using lagged values. 
+
+UnitEnergyCost = [ EN(t-1) * priceEN(t-1) ] / Q
 */
 
 v[3]=VL("EN",1);
@@ -455,16 +569,20 @@ v[5]=VL("Q",1);
 
 if(v[5]>0.01)
  {
-	v[6]=(v[3]*v[4])/v[5]; // compute the energy cost to produce one final good using lagged values
+	v[6]=(v[3]*v[4])/v[5];
  }
 else
 	v[6]=0;
 
 RESULT(v[6] )
 
+
+
 EQUATION("ClearingPrice")
 /*
-Comment
+xxx Never used in model
+
+ClearingPrice = price(t-1) * [(1 + (aClearingPrice * (UnitDemand - UnitSales) * 2) / (UnitDemand + UnitSales)]
 */
 
 v[0] = VL("price", 1);
@@ -479,9 +597,13 @@ else
  v[5]=v[0]*(1+v[6]*(v[3]-v[4])*2/(v[3]+v[4])); 
 RESULT(v[5] )
 
+
+
 EQUATION("price")
 /*
-Markup on the unit production cost
+Markup on the unit production cost of final demand goods
+
+price = markup * (UnitLaborCost + UnitEnergyCost)
 */
 v[10]=V("markup");
 v[22]=V("UnitLaborCost"); // labour in the first tier (the ones which define the production capacity)
@@ -506,37 +628,49 @@ if(v[15]==-1)
 else
  v[16]=v[14]*v[17]+(1-v[17])*v[15]; 
 */ 
+
 RESULT(v[14] )
+
+
 
 EQUATION("KEN")
 /*
-Compute the energy used by final good firms
+Compute the energy used by capital good firms
+
+KEN = KQ / KMaxEnergyEfficiency
 */
 v[0]=V("KQ");
 v[1]=V("KMaxEnergyEfficiency");
 RESULT(v[0]/v[1] )
 
+
+
 EQUATION("KUnitEnergyCost")
 /*
-comment
-*/
+Compute the energy cost to produce one capital good 
 
+KUnitEnergyCost = [ KEN * priceEN ] / KQ
+*/
 v[3]=V("KEN");
 v[4]=V("priceEN");
 v[5]=V("KQ");
 
 if(v[5]>0.01)
  {
-	v[6]=(v[3]*v[4])/v[5]; // compute the energy cost to produce one final good
+	v[6]=(v[3]*v[4])/v[5];
  }
 else
 	v[6]=0;
 
 RESULT(v[6] )
 
+
+
 EQUATION("KPrice")
 /*
-Comment
+Markup on the unit production cost of capital
+
+Kprice = Kmarkup * ( (LaborCostK/KQ) + UnitEnergyCost)
 */
 v[0]=V("Kmarkup");
 v[8]=V("KQ"); // productive capacity of the firm 
@@ -546,9 +680,14 @@ v[7]=(v[0])*(v[4]/v[8]+v[1]);
 
 RESULT(v[7] )
 
+
+
 EQUATION("KProfit")
 /*
-Comment
+Computes capital firm profits and increases KCumProfit
+xxx - there is another Kprofit equationwhich doesn't include energy 
+
+KProfit = [ (KPrice - KUnitEnergyCost) * KProductionFlow] - LaborCostK
 */
 
 V("KNbrEngineers"); // compute first the number of engineers which use the past value of cumulated profits
@@ -558,27 +697,37 @@ v[8]=V("LaborCostK");
 v[2]=V("KUnitEnergyCost");
 
 v[6]=((v[0]-v[2])*v[1])-v[8];
-v[7]=INCR("KCumProfit",v[6]);
+v[7]=INCR("KCumProfit",v[6]); //  increases KCumProfit
 
 RESULT(v[6] )
 
+
+
 EQUATION("TotEN")
 /*
-Total Energy Consumption of FIRMS
-*/
+Total Energy Consumption of FIRMS 
 
+TotEN = SUM(EN)
+*/
 RESULT(SUM("EN") )
+
+
 
 EQUATION("TotKEN")
 /*
 Total Energy Consumption of KFIRMS
-*/
 
+TotKEN = SUM(KEN)
+*/
 RESULT(SUM("KEN") )
+
+
 
 EQUATION("TotEnergyConsumption")
 /*
 Total Energy Consumption (Firms+Kfirms)
+
+TotEnergyConsumption = TotEN + TotKEN
 */
 v[0]=V("TotEN");
 v[1]=V("TotKEN");
@@ -589,7 +738,9 @@ RESULT(v[0]+v[1] )
 
 EQUATION("CapitalStock")
 /*
-Compute the depreciation of capital
+Compute the depreciation of capital. Scrap capital if firm's capital stock is very low relative to total. Update CapitalCapacity
+
+CapitalStock = accumulate(K * (1 - CapitalDepress)^KAge) 
 */
 
 v[0]=VL("CapitalStock",1);
@@ -616,7 +767,8 @@ if(v[6]/v[0]>0.01) // Scrap if relative value is low
  }
 //if(v[10]==0)
  //INTERACT("Merde 2", v[6]);
-WRITE("CapitalCapacity",v[10]/v[2]);
+WRITE("CapitalCapacity",v[10]/v[2]); // Update CapitalCapacity
+
 RESULT(v[10] )
 
 
@@ -624,6 +776,8 @@ RESULT(v[10] )
 EQUATION("KNbrEngiProd")
 /*
 Defines the number of engineers working on productivity
+
+KNbrEngiProd = KNbrEngineers(t-1) * KShareEngiProd
 */
 V("KSpecialization");
 
@@ -633,9 +787,13 @@ v[2]=v[0]*v[1];
 
 RESULT(v[2] )
 
+
+
 EQUATION("KNbrEngiEff")
 /*
 Defines the number of engineers working on efficiency
+
+KNbrEngiEff = KNbrEngineers(t-1) * KShareEngiEff
 */
 V("KSpecialization");
 
@@ -645,9 +803,13 @@ v[2]=v[0]*v[1];
 
 RESULT(v[2] )
 
+
+
 EQUATION("KNbrEngiProductionEff")
 /*
 Defines the number of engineers working on process efficiency
+
+KNbrEngiProductionEff = KNbrEngineers(t-1) * KShareEngiProductionEff
 */
 V("KSpecialization");
 
@@ -657,12 +819,21 @@ v[2]=v[0]*v[1];
 
 RESULT(v[2] )
 
+
+
 EQUATION("CurrentProductivity")
 /*
-Changes in the productivity of kapital thanks to R&D
+Changes in the labour (xxx is this right) productivity of capital thanks to R&D
+
+if:  
+RND < 1-exp[-(KNbrEngiProd * z)]
+(where RND is a random draw of a number uniformly distributed between 0 and 1)
+ 
+then firm innovates, with CurrentProductivity determined as:
+CurrentProductivity = CurrentProductivity(t-1) + max( [norm(0 , ProductivityShock)] , 0);
+(where norm(mean,dev) is a random draw from a normal distribution with mean mean and standard deviation dev
 */
 //V("InvestmentDecision");
-
 v[0]=VL("CurrentProductivity",1);
 v[1]=V("KNbrEngiProd");
 v[2]=V("z");
@@ -679,13 +850,24 @@ else
 	v[6]=0;
 	}
 v[7]=max(v[6],0);
-v[8]=v[0] + v[7];
+v[8]=v[0]+v[7];
 
 RESULT(v[8] )
 
+
+
 EQUATION("CurrentEfficiency")
 /*
-Changes in the efficiency of kapital thanks to R&D
+Changes in the efficiency of capital thanks to R&D
+
+if:  
+RND < 1-exp[-(KNbrEngiEff * z)]
+(where RND is a random draw of a number uniformly distributed between 0 and 1)
+ 
+then firm innovates, with CurrentEfficiency determined as:
+CurrentEfficiency = CurrentEfficiency(t-1) + max( [norm(0 , ProductivityShock)] , 0);
+(where norm(mean,dev) is a random draw from a normal distribution with mean mean and standard deviation dev
+
 */
 //V("InvestmentDecision");
 
@@ -705,17 +887,27 @@ else
 	v[6]=0;
 	}
 v[7]=max(v[6],0);
-v[8]=v[0] + v[7];
+v[8]=v[0]+v[7];
 
 RESULT(v[8] )
 
+
+
 EQUATION("KMaxEnergyEfficiency")
 /*
-R\&D to improve the energy efficiency of capital good production
+R&D to improve the energy efficiency of capital good production
+
+if:  
+RND < 1-exp[-(KNbrEngineers * z)]
+(where RND is a random draw of a number uniformly distributed between 0 and 1)
+ 
+then firm innovates, with KMaxEnergyEfficiency determined as:
+KMaxEnergyEfficiency = EnergyEfficiencyShock(t-1) + max( [norm(0 , EnergyEfficiencyShock)] , 0);
+(where norm(mean,dev) is a random draw from a normal distribution with mean mean and standard deviation dev
 */
 //V("InvestmentDecision");
 
-v[0]=VL("KMaxEnergyEfficiency",1);
+v[0]=VL("EnergyEfficiencyShock",1);
 v[1]=V("EnergyEfficiencyShock");
 v[2]=VL("KNbrEngineers",1);
 v[3]=V("z");
@@ -734,9 +926,13 @@ v[10]=max(v[8],0);
 v[11]=v[0] + v[10];
 RESULT(v[11] )
 
+
+
 EQUATION("betaEff")
 /*
-compute the value of betaEff depending on the relative changes of energy price and minimum wage.
+compute the value of betaEff depending on the relative changes of energy price and minimum wage. betaEff is an exoponent in the equation for PlaceOrder, and determines, with betaProd, the weighting given to energy and labour productivity when ordering new capital 
+
+betaEff = betaEff(t-1) * (1 + (growth rate of priceEN - growth rate of MinWage) * psi
 */
 
 v[0]=VL("betaEff",1);
@@ -750,10 +946,15 @@ v[7]=v[5]/v[4]-1; //compute the growth rate of MinWage
 v[10]=v[0]*(1+(v[6]-v[7])*v[1]);
 RESULT(v[10] )
 
+
+
 EQUATION("betaProd")
 /*
-compute the value of betaEff depending on the relative changes of energy price and minimum wage.
+compute the value of betaProd depending on the relative changes of energy price and minimum wage. betaProd is an exoponent in the equation for PlaceOrder, and determines, with betaEff, the weighting given to energy and labour productivity when ordering new capital 
+
+betaEff = betaEff(t-1) * (1 + (growth rate of priceEN - growth rate of MinWage) * psi
 */
+/
 
 v[0]=V("betaEff");
 v[1]=V("betaPrice");
@@ -763,9 +964,12 @@ v[10]=1-v[0]-v[1]-v[2];
 RESULT(v[10] )
 
 
+
 EQUATION("GreenVintageStock")
 /*
 compute the stock of green capital
+
+GreenVintageStock = GreenK * (1 - GreenCapitalDep)^GreenKAge
 */
 
 v[0]=V("GreenK");
@@ -777,6 +981,8 @@ if(v[5]==0)
 
 RESULT(v[5] )
 
+
+
 EQUATION("GreenCapitalStock")
 /*
 Sum of GreenVintageStock
@@ -787,17 +993,22 @@ RESULT(v[0] )
 
 
 
-
 EQUATION("GreenKAge")
+/*
+compute the age of green capital
+
+GreenKAge = GreenKAge(t-1) + 1
+*/
 v[0]=VL("GreenKAge",1);
 RESULT((v[0]+1) )
-
 
 
 
 EQUATION("BalanceE")
 /*
 Compute Revenues of the Energy sector and add them to BalanceE
+
+BalanceE = BalanceE(t-1) + (TotEnergyConsumption * priceEN)
 */
 
 v[0]=V("TotEnergyConsumption");
@@ -807,9 +1018,10 @@ v[2]=VL("BalanceE",1);
 RESULT(v[2]+v[0]*v[1] )
 
 
+
 EQUATION("MoAvGreenInvestment")
 /*
-Comment 
+calculates moving average of Green Investment
 */
 
 v[0]=V("GreenInvestment");
@@ -820,9 +1032,10 @@ v[2]= 0.9*v[1]+0.1*v[0];
 RESULT(v[2] )
 
 
+
 EQUATION("MoAvGreenInvestmentGr")
 /*
-Comment 
+calculates growth rate of MoAvGreenInvestment (the moving average of green investment)
 */
 v[0]=V("MoAvGreenInvestment");
 v[1]=VL("MoAvGreenInvestment",1);
@@ -834,9 +1047,10 @@ v[2]=v[0]/v[1]-1;
 RESULT(v[2] )
 
 
+
 EQUATION("MoAvInvestment")
 /*
-Comment 
+calculates moving average of Investment
 */
 
 v[0]=SUM("KProductionFlow");
@@ -849,7 +1063,7 @@ RESULT(v[2] )
 
 EQUATION("MoAvInvestmentGr")
 /*
-Comment 
+calculates growth rate of MoAvInvestmentGr (the moving average of investment)
 */
 
 v[0]=V("MoAvInvestment");
@@ -861,9 +1075,11 @@ v[3]=v[0]/v[1]-1;
 
 RESULT(v[3] )
 
+
+
 EQUATION("MoAvMinWageGr")
 /*
-Comment 
+calculates growth rate of MoAvMinWageGr (the moving average of minimum wage growth)
 */
 
 v[0]=VL("MinWage",1);
@@ -877,14 +1093,32 @@ v[4]= 0.99*v[3]+0.11*v[2];  // MoAvMinWageGr
 
 RESULT(v[4] )
 
+
+
 EQUATION("ProbToSwitch")
 /*
-  Comment 
+calculates probability for capital firms to switch R&D focus 
+
+ProbToSwitch = 1 - exp(v[10])
+
+if:
+KShareGreenKProd = 0 (i.e. the kfirm currently focuses its R&D on final good firms)
+then: 
+v[10] = weighted growth rate of MoAvInvestment - weighted growth rate of MoAvGreenInvestment; 
+and if: 
+weighted growth rate of MoAvInvestment > weighted growth rate of MoAvGreenInvestment
+then: v[10] = 0 (i.e. there is no reason to switch)
+ 
+else:
+KShareGreenKProd = 1 (i.e. the kfirm currently focuses its R&D on energy productivity of solar panels)
+then:
+v[10] = weighted growth rate of MoAvGreenInvestment - weighted growth rate of MoAvInvestment
+and if: weighted growth rate of MoAvGreenInvestment > weighted growth rate of MoAvInvestment  
+then: v[10] = 0 (i.e. there is no reason to switch)
+
 */
-  
 //v[0]=VS(p->up,"MoAvGreenInvestmentGr");
 //INTERACT("MoAvGreenInvestmentGr",v[0]);
-
 //v[1]=VS(p->up,"MoAvInvestmentGr");
 //INTERACT("MoAvInvestmentGr",v[1]);
 
@@ -925,35 +1159,15 @@ else
   }
 //INTERACT("v2",v[2]);
 
-v[20]=1-exp(v[10]); // proba to switch specialization
+v[20]=1-exp(v[10]); // prob to switch specialization
 
 RESULT(v[20] )
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 EQUATION("KSpecialization")
 /*
-Comment 
+ensures KSpecialization is equal to 1 (xxx check)
 */
   if (V("KShareEngiProductionEff")+V("KShareEngiEff")+V("KShareEngiProd")+V("KShareGreenKProd")!=1)
   { 
@@ -1014,29 +1228,11 @@ RESULT(1 )
   
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 EQUATION("KNbrGreenKProd")
 /*
 Defines the number of engineers working on solar panel productivity
+
+KNbrGreenKProd = KNbrEngineers(t-1) * KShareGreenKProd
 */
 VL("KSpecialization",1);
 v[0]=VL("KNbrEngineers",1);
@@ -1047,18 +1243,20 @@ RESULT(v[2] )
 
 
 
-
-
-
-
-
-
-
 EQUATION("GreenProductivity")
 /*
-Changes in the productivity of solar panel thanks to R&D
+Changes in the productivity of green capital thanks to R&D
+
+if:  
+RND < 1-exp[-(KNbrGreenKProd * z)]
+(where RND is a random draw of a number uniformly distributed between 0 and 1)
+ 
+then firm innovates, with GreenProductivity determined as:
+GreenProductivity = GreenProductivity(t-1) + max( [norm(0 , GreenKProdShock)] , 0);
+(where norm(mean,dev) is a random draw from a normal distribution with mean mean and standard deviation dev
 */
 //V("InvestmentDecision");
+
 
 v[0]=VL("GreenProductivity",1);
 v[1]=V("KNbrGreenKProd");
@@ -1082,12 +1280,11 @@ RESULT(v[8] )
 
 
 
-
-
-
 EQUATION("GreenVintageEN")
 /*
-compute green energy produced by a green vintage
+compute green energy produced by a green vintage.
+
+GreenVintageEN = GreenIncProductivity * alpha * GreenK * (1-GreenCapitalDep)^GreenKAge
 */
 
 v[0]=V("GreenK");
@@ -1098,16 +1295,16 @@ v[4]=V("alpha");
 v[5]=v[1]*v[4]*v[0]*pow((1-v[3]),v[2]);
 if(v[5]==0)
 	v[5]=0.0001; // avoid division by zero
-
 RESULT(v[5] )
 
 
 
 EQUATION("GreenEN")
 /*
-compute green energy produced
-*/
+sums green energy produced by each green vintage
 
+GreenEN = SUM(GreenVintageEN)
+*/
 v[0]=SUM("GreenVintageEN");
 
 RESULT(v[0] )
@@ -1117,9 +1314,9 @@ RESULT(v[0] )
 EQUATION("MaxENProduction") // Called by KCapital
 /*
 Compute the energy production of a new vintage for its whole lifespan
+
+MaxENProduction = alpha * GreenProductivity * [(1 - GreenCapitalDep) - (1 - GreenCapitalDep)^(MaxGreenKAge + 1)] / GreenCapitalDep
 */
-
-
 V("CallMinGreenId");
 
 v[0]=V("GreenProductivity");
@@ -1139,22 +1336,11 @@ RESULT(v[8] )
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 EQUATION("GreenEnergyCost")  // Called by KCapital
 /*
 Compute the investment cost to produce one unit of green energy during the whole life of the vintage. 
+
+GreenEnergyCost = KPrice / MaxENProduction
 */
 
 cur1=SEARCHS(p->up,"KFirm");
@@ -1175,7 +1361,9 @@ RESULT(v[2] )
 
 EQUATION("KGreenSpe") // Called by KFirm
 /*
-Define if the KFirm is specialized in greenK if its green energy cost is below average
+Define if the capital firm is specialized in green capital if its green energy cost is below average
+
+if GreenProductivity > AvGreenProductivity then firm is spcialized in green capital, otherwise is not
 */
 
 cur=SEARCHS(p->up->up,"Country");
@@ -1191,34 +1379,17 @@ RESULT(v[2] )
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 EQUATION("AvSpe") // Called by Country
 /*
- Compute the average energy cost to produce green energy of specialized KFirms
- */
+Computes the average energy cost to produce green energy of specialized KFirms (xxx is this right?)
+
+Computes:
+AvGreenEnergyCostSpe
+AvGreenProductivitySpe
+AvGreenKPriceSpe
+AvMaxENProduction
+NbrGreenKInno
+*/
 v[0]=v[1]=v[2]=v[3]=v[10]=v[11]=v[20]=v[21]=v[22]=v[30]=v[31]=v[32]=v[40]=v[41]=v[42]=0;
 CYCLE(cur,"KFirm")
 {
@@ -1272,19 +1443,11 @@ WRITE("NbrGreenKInno",v[2]);
 
 RESULT(1 )
   
-  
-  
-  
-  
-
-
-
-
 
 
 EQUATION("AvGreenProductivity") // Called by Country
 /*
-	Compute the average green productivity
+Compute the average green productivity
 */
 v[0]=AVE("GreenProductivity");
 
@@ -1292,37 +1455,12 @@ RESULT(v[0] )
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 EQUATION("NbrKGreenSpe") // Called by Country
 /*
-*/
+Computes the number of capital firms specialising in green capital
 
+NbrKGreenSpe = SUM(KGreenSpe)
+*/
 v[0]=SUM("KGreenSpe");
 if(v[0]<1)
 	INTERACT("zero KGreenSpe",v[0]);
@@ -1331,15 +1469,11 @@ RESULT(v[0] )
 
 
 
-
-
-
-
-
-
-
 EQUATION("DirtyENCost") // Called by energy
 /*
+calculates brown energy cost
+
+DirtyENCost = OilPrice / OilProd
 */
 v[2]=V("OilPrice");
 v[3]=V("OilProd");
@@ -1348,47 +1482,10 @@ RESULT(v[4] )
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 EQUATION("PlaceGreenOrder") // Called by energy
 /*
- */
+xxx to do
+*/
 if(V("GreenInvestment")<0.1)
   END_EQUATION(1); // stop
 
@@ -1477,87 +1574,22 @@ WRITES(cur2, "LocalGreenInvestmentOrder",0);
     END_EQUATION(1); // stop   	
   }
   
-
-
 RESULT(1 )
-  
-  
-  
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+ 
 
 
-  
-  
-
-
-  
-  
-  
-  
-  
-  
-  
-  
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-  
-
-
-
-
-
-
-
-
-
-    
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
-  
-
-
-
-
-EQUATION("GreenGrade") // Called by 
+EQUATION("GreenGrade")
 /*
-Comment   
+Builds an index to distribute demand across KFirms (xxx check)
+
+if:
+KGreenSpe = 1 
+
+then:
+GreenGrade = (Normalized GreenProductivity^0.33333) * (Normalized KPrice^-0.33333) * (Normalized WaitTime^-0.33333)
+
+otherwise: 
+GreenGrade = 0
 */
 
 
@@ -1606,8 +1638,7 @@ v[82]=v[52]/v[90]; // Av WaitTime
     
     // Test without search
     v[40]=V("GreenProductivity");
-    
-    //sprintf(msg, "\n GreenProductivity %g", v[40] ); plog(msg);
+        //sprintf(msg, "\n GreenProductivity %g", v[40] ); plog(msg);
     v[41]=V("KPrice");
     //sprintf(msg, "\n KPrice %g", v[41] ); plog(msg);
     v[42]=V("WaitTime");	
@@ -1636,50 +1667,12 @@ v[82]=v[52]/v[90]; // Av WaitTime
     
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 EQUATION("KProductionFlow")
 /*
- 
- */
+xxx to do
+
+KProductionFlow = min( [ KQ ] , [accumulate(KAmount - KCompletion) ] )
+*/
 
 cur6=SEARCHS(p->up->up,"Energy"); 
 if(cur6==NULL)
@@ -1882,50 +1875,15 @@ v[16]=v[15]-v[0];
 //if(v[15]<0 && v[0]!=0)
 //INTERACT("check the correspondence between production and KQ",v[0]);
 
-
-
-
 RESULT(v[13] )
   
-  
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 EQUATION("TotLocalGreenInvestment")
 /*
 Total amount of local green investment
+
+TotLocalGreenInvestment = SUM(LocalGreenInvestment)
 */
 
 v[0]=SUM("LocalGreenInvestment");
@@ -1934,16 +1892,11 @@ RESULT(v[0] )
 
 
 
-
-
-
-
-
-
-
 EQUATION("GreenInvestment")
 /*
 Define the amount of green investment
+
+GreenInvestment = 0.9 * GreenInvestment(t-1) + 0.1 * (DirtyEN * GreenCapacityGrowth + 0); 
 */
 v[2]=0;
 if(V("GreenEN")>1.1*V("TotEnergyConsumption"))
@@ -1971,13 +1924,12 @@ RESULT(v[6] )
 
 
 
-
-
-
 EQUATION("CallMinGreenId") 
-  /*
-   greenId is a proxy for the location quality of green investment
-   */
+/*
+greenId is a proxy for the location quality of green investment
+
+xxx to do
+*/
 v[0]=0;
 //cur1=SEARCHS(root,"Energy");
 //if(cur1==NULL)
@@ -2014,12 +1966,6 @@ RESULT(1 )
 
 
 
-
-
-
-
-
-
 EQUATION("FlippingCoin")
 /*
 A random result indicating with 0 if First0 is computed first or, with 1, if First1 must have the precedence
@@ -2032,11 +1978,17 @@ RESULT(v[0] )
 
 
 
-
-
 EQUATION("InvestmentDecision")
 /*
-Place an order of K if you need it and did not place an order as yet
+Place an order of K if you need it and did not place an order as yet. Updates "Waiting"
+
+If:
+Waiting = 1 
+KapitalNeed > 1
+RND < Liquidity(t-1)/TotalValue(t-1)
+
+then invest
+
 */
 v[5] = V("FlippingCoin");
 //if(v[5]==1)
@@ -2063,9 +2015,14 @@ if(v[1]>0 && RND<v[4]/v[3] )
 RESULT( 1)
 
 
+
 EQUATION("GreenInvestmentDecision")
 /*
 Place on order of K if you need it and did not place an order as yet
+
+If 
+GreenInvestment > 0
+then invest
 */
 
 v[0] = V("FlippingCoin");
@@ -2083,28 +2040,6 @@ RESULT( 1)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //DEBUG_AT(0);
 /******************************************
 *
@@ -2114,11 +2049,12 @@ RESULT( 1)
 
 
 
-
 EQUATION("Health")
 /*
 Measure the sustainability of the firm comparing the ratio of (smoothed) monetary sales to cumulated profits.
 Values close to 0 approach exit, 1 is perfect health.
+
+Health = [aHealth * Health(t-1)] + [(1 - aHealth ) * min(1, smoothMonSales / NetWorth)]
 */
 v[2]=V("aHealth");
 
@@ -2139,9 +2075,13 @@ v[5]=v[2]*CURRENT+(1-v[2])*v[4];
 // INTERACT("neg.health", v[3]);
 RESULT(v[5] )
 
+
+
 EQUATION("smoothMonSales")
 /*
 Smoothed value of MonetarySales
+
+smoothMonSales = smoothMonSales(t-1) * aMonSales + (1 - aMonSales) * MonetarySales
 */
 V("Trade");
 v[0]=V("aMonSales");
@@ -2149,9 +2089,10 @@ v[1]=V("MonetarySales");
 RESULT(CURRENT*v[0]+(1-v[0])*v[1] )
 
 
+
 EQUATION("Entry")
 /*
-Entry of new firms, function triggered by SectorEntry
+Determines and writes new values for newly entered firms, function triggered by SectorEntry
 */
 
 v[1]=VS(c,"IdGood");
@@ -2261,18 +2202,14 @@ WRITES(cur5,"blPrice",0.5*V("AvPrice"));
 
 
 
-
-
-
-
-
 //INTERACT("Entry",v[0]);
 RESULT( 1)
 
 
+
 EQUATION("ClearExitRecord")
 /*
-Prepare the computation of the exit record
+Prepare the computation of the exit record for exiting firms
 */	
 
 CYCLE(cur, "Sectors")
@@ -2284,11 +2221,16 @@ CYCLE(cur, "Sectors")
 cur=SEARCH("Bank");
 WRITES(cur,"CapitalDestroyed",0);
 WRITES(cur,"CapitalDemand",0);
+so
 RESULT(1 )
+
+
 
 EQUATION("sBalanceF")
 /*
-Comment
+smoothed value of BalanceF
+
+sBalanceF = sBalanceF(t-1) * 0.95 + 0.05 * BalanceF
 */
 v[0]=V("BalanceF");
 
@@ -2297,6 +2239,8 @@ v[2]=V("DebtF");
 if(v[2]!=0)
  WRITE("RRoK",v[1]/v[2]);
 RESULT(v[1] )
+
+
 
 EQUATION("Exit")
 /*
@@ -2350,12 +2294,15 @@ CYCLE_SAFE(cur, "Firm")
 WRITE("TotDebt",v[70]);
 RESULT(v[4] )
 
+
+
 EQUATION("Demography")
 /*
 Comment
+
+xxx no idea
 */
 cur=SEARCHS(p->up,"Supply");
-
 
 VS(cur,"Exit");
 v[3]=V("numExit");
@@ -2375,7 +2322,6 @@ RESULT( 1)
 
 
 
-
 EQUATION("CounterIdFirm")
 /*
 Issue idFirm progressive numbers
@@ -2384,11 +2330,15 @@ Issue idFirm progressive numbers
 RESULT(CURRENT+1 )
 
 
+
+
 /******************************************
 *
 *	DEMAND
 *
 ******************************************/
+
+
 
 
 EQUATION("x")
@@ -2406,10 +2356,16 @@ else
 RESULT(v[1] )
 
 
+
 EQUATION("TotIterations")
 /*
-Total number of iterations for a class
-Thios is computed separately, in order to take into account the redistribution of expenditure due to missing goods, and avoid that expenditure level is modified by rounding the number of iterations to an integer
+xxx don't understand
+
+Total number of iterations for a class (used to compute the consumption share of each need - i.e. the number of iterations for each need)
+
+This is computed separately, in order to take into account the redistribution of expenditure due to missing goods, and avoid that expenditure level is modified by rounding the number of iterations to an integer
+
+TotIterations = Accumulate(NumIterations * TempIterations)
 */
 
 v[5]=0;
@@ -2428,9 +2384,12 @@ CYCLE(cur, "Need")
 RESULT(v[5] )
 
 
+
 EQUATION("Visibility")
 /*
-Comment
+Calculates firm visibility - more backlogs decrease visibility
+
+Visibility = Visibility(t-1) * 0.9 + 0.1 * max( [ExpectedSales - backlog]/ExpectedSales , 0.001);
 */
 //END_EQUATION(1);
 v[0]=V("backlog");
@@ -2449,11 +2408,12 @@ v[5]=v[1]*0.9+0.1*v[4];
 RESULT(v[5] )
 
 
+
 EQUATION("TTB_multiplWinner")
 /*
+xxx no idea. What is a TTB?
 
 The changes cannot work, since you get the optimum before making any selection.
-
 
 Standard TTB, but all the winners remain marking "app" to 1, and returning the number of winners.
 
@@ -2605,8 +2565,12 @@ CYCLES(cur9,cur8, "sFirm")
 
 RESULT(v[0] )
 
+
+
 EQUATION("Production")
 /*
+xxx. what does this equation do?
+
 After trading fix any remaining variable to compute
 */
 
@@ -2661,11 +2625,14 @@ CYCLE(cur, "KFirm")
 WRITE("AvAge",v[5]/v[6]);
 
 V("AllocateBlRecouped");
+
 RESULT(1 )
+
+
 
 EQUATION("AllocateBlRecouped")
 /*
-Comment
+xxx. what does this equation do?
 */
 v[0]=v[1]=v[2]=v[3]=v[4]=v[5]=0;
 
@@ -2690,8 +2657,11 @@ CYCLE(cur, "Class")
 RESULT(1 )
 
 
+
 EQUATION("Trade")
 /*
+xxx. what does this equation do?
+
 Set a trading cycle:
 - initialize "sales" to zero in firms;
 - compute the sales for each firm as the total of classes and needs 
@@ -2710,7 +2680,7 @@ CYCLE(cur1, "Supply")
 CYCLE(cur, "Class")
  {
   v[4]=VS(cur,"Expenditure");
-  WRITES(cur,"NoConsumption",0); // after having computed the expenditure set the non expenditure to 0, to be computed again inthis period for the following period expenditures
+  WRITES(cur,"NoConsumption",0); // after having computed the expenditure set the non expenditure to 0, to be computed again in this period for the following period expenditures
   v[14]=v[21]=0;
   CYCLES(cur, cur1, "Need")
    { // make a first cycle through needs to check which products are available in the market
@@ -2775,17 +2745,32 @@ CYCLE(cur, "Sectors")
  VS(cur,"RedistributeSales");   
  }
 
-
 cur=SEARCH("Bank");
+
 RESULT( 1)
 
+
+
 EQUATION("RedistributeSales")
+
 /*
 This routine redistributes sales in order to avoid excessive backlogs. The logic is that customers choosing firms that cannot deliver will redirect their expenses to firms with available capacity.
 
 The routine collects total capacity in excess of demand and demand in excess of capacity. The latter is redistributed in proportion to the former. 
 
 In case total capacity of the industry is not sufficient to meet the demand, the residual is distributed in proportion to sales
+
+If:
+units sold > quantity supplied (i.e. oversold)
+
+then:
+RedistributeSales = accumulate(MonetarySales) - accumulate([price * Q] + max(0, excess sales over production - excess capacity) * MonetarySales / accumulate(MonetarySales) )
+
+else (i.e. undersold): 
+RedistributeSales = accumulate(MonetarySales) - [accumulate(MonetarySales + (excess sales over production - max(0 , excess sales over production - excess capacity available to serve extra customers) * (Q * Price - MonetarySales) / excess capacity available to serve extra customers] + [max(0, excess sales over production - excess capacity) * MonetarySales / accumulate(MonetarySales)] ) ]
+
+xxx to finish.
+
 */
 
 if(VS(p->up,"Redistribute")==0)
@@ -2819,6 +2804,7 @@ CYCLE(cur, "sFirm")
  }
 if(v[3]==0)
  END_EQUATION(-1);
+ 
 v[9]=max(0,v[0]-v[2]); //over sales
 v[13]=v[0]-v[9];
 CYCLE(cur, "sFirm")
@@ -2829,6 +2815,7 @@ CYCLE(cur, "sFirm")
   v[7]=VLS(cur->hook,"Q",1);
   if(v[6]>v[7])
    {//oversold
+
     v[11]=v[7]*v[5];//maximum sales
     //WRITES(cur,"app1",v[11]);
     v[12]=v[9]*v[4]/v[8];
@@ -2851,6 +2838,8 @@ CYCLE(cur, "sFirm")
  }
 
 RESULT((v[8]-v[10]) )
+
+
 
 EQUATION("UnitDemand")
 /*
@@ -6342,11 +6331,11 @@ CYCLE(cur, "Supply")
   CYCLES(cur, cur1, "Firm")
    {
     v[1]=VS(cur1,"Revenues");
-    v[4]+=v[1];
+    v[4]+=v[1]; //												v[4] = accumulated(revenues)
     v[5]=VS(cur1,"UnitSales");
     v[6]=VS(cur1,"ConstPrice");
-    v[7]=v[5]*v[6];
-    v[9]+=v[7];
+    v[7]=v[5]*v[6]; //										v[7] = UnitSales * ConstPrice
+    v[9]+=v[7]; //												v[9] = GdpConstantF = accumulated(UnitSales * ConstPrice)
    }
 
  }
@@ -6357,37 +6346,36 @@ CYCLE(cur, "Machinery")
     v[5]=VS(cur1,"KProductionFlow");
     v[6]=VS(cur1,"KPrice");
     v[11]=VS(cur1,"KConstPrice");    
-    v[8]+=v[6]*v[5];
-    v[10]+=v[11]*v[5];
+    v[8]+=v[6]*v[5]; //										v[8] = accumulated(KProductionFlow * KPrice)
+    v[10]+=v[11]*v[5]; // 								v[10] = GdpConstantK = accumulated(KProductionFlow * KConstPrice)
    }
 
  }
  
 v[20]=V("priceEN");
 v[21]=V("TotEnergyConsumption");
-v[22]=v[20]*v[21];
+v[22]=v[20]*v[21]; // 										v[22] = priceEN * TotEnergyConsumption
 
 WRITE("GdpConstant_lag",V("GdpConstant"));
-
  
-v[11]=v[9]+v[10]+v[21];
-v[12]=v[4]+v[8]+v[22];
+v[11]=v[9]+v[10]+v[21]; //						 		v[11] = GdpConstant = accumulated(UnitSales * ConstPrice) + accumulated(KProductionFlow * KConstPrice) + TotEnergyConsumption
+v[12]=v[4]+v[8]+v[22]; //						 			v[12] = accumulated(revenues) + accumulated(KProductionFlow * KPrice) + (priceEN * TotEnergyConsumption)
 if(v[12]==0)
 	v[13]=0;
 else
 	v[13]=1/v[12];
-v[14]=v[4]*v[13];
-v[15]=v[8]*v[13];
+v[14]=v[4]*v[13]; //											v[14] = ConsumptionGdpRatio = accumulated(revenues) * (1 / [accumulated(revenues) + accumulated(KProductionFlow * KPrice) + (priceEN * TotEnergyConsumption) ] )
+v[15]=v[8]*v[13]; //											v[15] = InvestmentGdpRatio = accumulated(KProductionFlow * KPrice) * (1 / [accumulated(revenues) + accumulated(KProductionFlow * KPrice) + (priceEN * TotEnergyConsumption) ] )
 
-v[30]=v[22]*v[13];
+v[30]=v[22]*v[13]; //											v[30] = EnergyGdpRatio = (priceEN * TotEnergyConsumption) * (1 / [accumulated(revenues) + accumulated(KProductionFlow * KPrice) + (priceEN * TotEnergyConsumption) ] )
 WRITE("GdpConstant",v[11]);
 WRITE("GdpConstantF",v[9]);
-WRITE("GdpConstantK",v[10]); // Proxy for investment at constant prices
+WRITE("GdpConstantK",v[10]); // 					Proxy for investment at constant prices
 WRITE("ConsumptionGdpRatio",v[14]);
 WRITE("InvestmentGdpRatio",v[15]);
 WRITE("EnergyGdpRatio",v[30]);
 
-RESULT(v[12] )
+RESULT(v[12] ) // 												v[12] = accumulated(revenues) + accumulated(KProductionFlow * KPrice) + (priceEN * TotEnergyConsumption)
 
 
 
