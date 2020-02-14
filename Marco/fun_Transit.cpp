@@ -3,6 +3,12 @@
 extern char msg[];
 MODELBEGIN
 
+EQUATION("AvMaxEfficiency")
+/*
+*/
+v[1]=AVE("MaxEfficiency");
+
+RESULT(v[1] )
 
 EQUATION("AvActualGreenEnergyCost")
 /*
@@ -164,6 +170,13 @@ EQUATION("TotUnitDemand")
 /*
 */
 v[0]=SUM("UnitDemand");
+
+RESULT(v[0] )
+
+EQUATION("TotKNbrWorkers")
+/*
+*/
+v[0]=SUM("KNbrWorkers");
 
 RESULT(v[0] )
 
@@ -751,8 +764,13 @@ v[5]=V("MinWage");
 v[6]=v[3]/v[2]-1; //compute the growth rate of priceEN
 v[7]=v[5]/v[4]-1; //compute the growth rate of MinWage
 v[10]=v[0]*(1+(v[6]-v[7])*v[1]);
-RESULT(v[10] )
 
+if(t>2)
+{v[11]=v[10];}
+else
+{v[11]=v[0];}
+
+RESULT(v[11] )
 EQUATION("betaProd")
 /*
 compute the value of betaEff depending on the relative changes of energy price and minimum wage.
@@ -806,8 +824,8 @@ Compute Revenues of the Energy sector and add them to BalanceE
 v[0]=V("TotEnergyConsumption");
 v[1]=V("priceEN");
 v[2]=VL("BalanceE",1);
-
-RESULT(v[2]+v[0]*v[1] )
+v[3] = V("OilIncomeReturned");
+RESULT(v[2]+v[0]*v[1]+v[3] )
 
 
 EQUATION("MoAvGreenInvestment")
@@ -2259,6 +2277,11 @@ WRITELS(cur4,"IncSkillBiais",0.2,t);
 WRITELS(cur4,"KAge",0,t);
 WRITELS(cur4,"MaxKQ",0,t);
 
+v[50]=V("AvMaxEfficiency");
+
+//INTERACT("AvEff",v[50]);
+WRITELS(cur4,"IncEfficiency",v[50],t);
+
 //cur5=SEARCHS(cur1,"blItem");
 //WRITES(cur5,"blPrice",0.5*V("AvPrice"));
 
@@ -2380,7 +2403,8 @@ if(v[3]>0)
  MULT("AvAgeDeath",1/v[3]);
 
 v[4]=V("probEntry");
-if(RND<v[4])
+v[5] =min(0.2, max(V("UnemploymentRate"),0.01));
+if(RND<v[4]*v[5])
  { //v[1]=VS_CHEAT(cur,"Entry",p);
 	 v[1]=V_CHEATS(cur,"Entry",p);
    INCR("NFirmsS",v[1]);
@@ -2487,8 +2511,13 @@ v[0]=0;
 v[31]=VS(c->up,"Expenditure")/VS(c->up,"TotIterations"); //amount to spend on this iteration
 v[30]=VS(c,"IdNeed");
 
-cur9=SEARCH_CND("IdGood",v[30]);
-
+if(c->hook==NULL)
+ {
+  cur9=SEARCH_CND("IdGood",v[30]);
+  c->hook=cur9;
+ } 
+else
+ cur9=c->hook;
 CYCLES(c, cur, "DCh")
   WRITES(cur,"temp",-1);//set to -1 the max value
 
@@ -2721,9 +2750,98 @@ CYCLE(cur1, "Supply")
   }
  }
 
+v[70]=v[71]=0;
 CYCLE(cur, "Class")
  {
   v[4]=VS(cur,"Expenditure");
+  v[70]+=v[4];
+  WRITES(cur,"NoConsumption",0); // after having computed the expenditure set the non expenditure to 0, to be computed again inthis period for the following period expenditures
+  v[14]=v[21]=0;
+  v[18] = VS(cur, "Competitiveness");
+  CYCLES(cur, cur1, "Need")
+   { // Cycle through the needs of the class
+    if(cur1->hook==NULL)
+      {//this hook should point to the sector of the need, find it if not already set
+       v[10]=VS(cur1,"IdNeed");
+       cur1->hook = SEARCH_CND("IdGood", v[10]); 
+      } 
+    if(VS(cur1->hook, "NFirmsS")<1)
+     INTERACTS(cur1, "Number of SFirm=0",v[14]);
+    v[12]=VS(cur1, "Share");
+    v[13]=v[12]*v[4];
+    v[30]=-1;
+    CYCLES(cur1->hook, cur2, "sFirm")
+     {//Find the maximum price
+      cur3 = SEARCH_CNDS(cur2->hook, "IdCh", 1);
+      v[31] = VS(cur3, "x");
+      if(v[31]>v[30])
+        v[30]=v[31];
+       
+     }    
+    v[30]*=1.1;//increase the maximum price of 10% to avoid the indicator to be 0 
+    v[17]=0;     
+    CYCLES(cur1->hook, cur2, "sFirm")
+     {//Cycle through all firms producing the good for this need
+      cur4 = SEARCHS(cur2->hook, "Ch");
+      v[15]=1;
+      CYCLES(cur1, cur3, "DCh")
+        {//Double cycle, through the characteristics of the firm and those of the consumer class
+        	v[14] = VS(cur4, "x"); //value of the characteristic
+        	v[16] = VS(cur3, "tau");//preference of the class for this characteristic
+        	if(VS(cur4, "IdCh")==1)
+          	v[15]*=pow(v[30]-v[14],v[16]);//Factor for price
+         else
+          	v[15]*=pow(v[14],v[16]);//Factor for quality    
+         if(is_nan(v[15])==true)
+       INTERACTS(cur4,"NAN15", v[15]);  	       	
+        	cur4=cur4->next;
+        }
+        v[19]=pow(v[15],v[18]);
+      if(is_nan(v[19])==true)
+       INTERACTS(cur2,"NAN", v[15]);  
+      WRITES(cur2, "app2", v[19]);
+      v[17]+=v[19];
+     } 
+    CYCLES(cur1->hook, cur2, "sFirm")
+     {//Cycle again through the firms supplying this good
+      v[20] = VS(cur2, "app2");
+      v[21]= v[13]*v[20]/v[17];//Share of the expenditures allocated to the firm
+      INCRS(cur2->hook, "MonetarySales", v[21]);
+      WRITES(cur2, "app3", v[20]/v[17]);
+      v[71]+=v[21];
+     }
+   }
+  } 
+
+if(abs(v[70]-v[71])>0.001)
+ LOG("\nExpenditures %lf\nMonetary sal %lf (%lf)\n",v[70],v[71], abs(v[70]-v[71]));
+
+RESULT( 1)
+
+
+
+EQUATION("TradeXXX")
+/*
+Set a trading cycle:
+- initialize "sales" to zero in firms;
+- compute the sales for each firm as the total of classes and needs 
+*/
+
+CYCLE(cur1, "Supply")
+ {
+  CYCLES(cur1, cur, "Firm")
+  {
+   v[1]=VS(cur,"MonetarySales");
+   WRITES(cur,"MonetarySalesL",v[1]); // before setting the sales to 0 for the current period computation, register the lagged value of monetary sales
+   WRITES(cur,"MonetarySales",0);
+  }
+ }
+
+v[70]=0;
+CYCLE(cur, "Class")
+ {
+  v[4]=VS(cur,"Expenditure");
+  v[70]+=v[4];
   WRITES(cur,"NoConsumption",0); // after having computed the expenditure set the non expenditure to 0, to be computed again inthis period for the following period expenditures
   v[14]=v[21]=0;
   CYCLES(cur, cur1, "Need")
@@ -2789,10 +2907,17 @@ CYCLE(cur, "Sectors")
  VS(cur,"RedistributeSales");   
  }
 
+v[71]=0;
+CYCLE(cur, "Firm")
+{
+	v[71] += VS(cur, "MonetarySales");
+}
+
+if(abs(v[70]-v[71])>0.001)
+ LOG("\nExpenditures %lf\nMonetary sal %lf (%lf)\n",v[70],v[71], abs(v[70]-v[71]));
 
 cur=SEARCH("Bank");
 RESULT( 1)
-
 EQUATION("RedistributeSales")
 /*
 This routine redistributes sales in order to avoid excessive backlogs. The logic is that customers choosing firms that cannot deliver will redirect their expenses to firms with available capacity.
@@ -3593,6 +3718,24 @@ v[34]=(v[31])*v[33];
 
 RESULT(v[34])
 
+EQUATION("OilIncomeReturned")
+/*
+Income from oil used to payback debt
+*/
+v[0] = V("OilIncome");
+v[1] = VL("BalanceE", 1);
+v[2]=max(0,min(v[0],-v[1]));
+RESULT(v[2] )
+
+EQUATION("OilNetIncome")
+/*
+Income available to be spent for consumption
+*/
+v[0] = V("OilIncome");
+v[1] = V("OilIncomeReturned");
+RESULT(v[0]-v[1] )
+
+
 
 EQUATION("Income")
 /*
@@ -3607,7 +3750,7 @@ v[14]=V("DividendsC");
 v[12]=V("NoConsumption");
 v[20]=V("LiquidityRentsC");
 
-v[34]=V("OilIncome")*v[3];
+v[34]=V("OilNetIncome")*v[3];
 
 
 v[5]=v[0]+v[1]+v[3]*v[4]+v[14]+v[12] +v[34];
@@ -4182,8 +4325,13 @@ CYCLE_SAFE(cur, "Capital")
 //  else
 //   DELETE(cur); 
 
+ v[25]=VS(cur, "IncEfficiency");
+ v[20]+=(v[7]*v[25]);
 }
+
 v[8]=v[0]/v[1];//Max Labor productivity computed as the weighted average of the incorporated productivity in every capital vintages
+v[28]=v[20]/v[1];
+WRITE("MaxEfficiency", v[28]);
 
 //v[50]=v[1]/v[40];
 //WRITE("CapitalStock",v[1]);
@@ -5014,7 +5162,7 @@ NOTE: probably it makes sense to use levels for all variables. That is, when the
 */
 //V("NbrWorkers");
 v[0]=VL("MinWage",1);
-//END_EQUATION(v[0]);
+END_EQUATION(v[0]);
 v[10]=V("InitAggProd"); //the reference level of productivity 
 v[2]=V("MovAvMaxLProd");
 v[43]=VL("MovAvMaxLProd",1);
@@ -5386,6 +5534,9 @@ Long term unemployment rate
 
 v[0]=VL("LTUnemployment",1);
 v[1]=V("UnemploymentRate");
+if(t==1)
+ END_EQUATION(v[1]);
+
 v[2]=V("aLTUR");
 
 v[3]=v[0]*v[2]+(1-v[2])*v[1];
@@ -5398,6 +5549,8 @@ Short term unemployment rate
 
 v[0]=VL("STUnemployment",1);
 v[1]=V("UnemploymentRate");
+if(t==1)
+ END_EQUATION(v[1]);
 v[2]=V("aSTUR");
 
 v[3]=v[0]*v[2]+(1-v[2])*v[1];
