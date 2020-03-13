@@ -1,7 +1,137 @@
-#define NO_POINTER_INIT
+//#define NO_POINTER_INIT
 #include "fun_head_fast.h"
+
 extern char msg[];
 MODELBEGIN
+
+EQUATION("KProductionFlow")
+/*
+
+ */
+//Activity of the K producing firm
+v[0]=V("KQ"); //production capacity of the firm
+v[1]=V("NumOrders");
+if(v[1]==0)
+  END_EQUATION(0);
+v[2]=v[0]/v[1]; //one way to determine the amount of K production capacity per order. Otherwise...
+
+v[3]=0;
+CYCLE(cur, "Order")
+{
+  v[4]=VS(cur,"KAmount");
+  v[5]=VS(cur,"KCompletion");
+  v[3]+=v[4]-v[5];
+}
+cur5=SEARCH("BankK");
+WRITES(cur5,"KRevenues",0);
+
+CYCLE_SAFE(cur, "Order")
+{//increase the level of advancement of the orders and, if completed, remove the order. Given the production capacity, devote it respecting oreders' order (first comes first go, which allows to respect the priority given by customers, on side, and to reduce the dofferences between the price agreed upon ordering and the price at which the kapital is sold)
+  v[4]=VS(cur,"KAmount");
+  v[5]=VS(cur,"KCompletion");
+  v[6]=(v[4]-v[5]); // given the missing quantity of the current order
+  //v[7]=v[6]*v[0]; //share of production capacity devoted to this order
+  v[8]=min(v[0], v[4]-v[5]); //use the production capacity needed actually neded to produce the order, or exhaust here the production capacity (for the current period)
+  INCRS(cur,"KCompletion",v[8]);
+  v[0]=v[0]-v[8];
+  v[5]=VS(cur,"KCompletion"); //update the completion level  in order to cancel the order if done
+  if(v[5]>=v[4])
+  {//order fulfilled. Either search for the ordering firm, or simply use the hook
+    if(v[5]>0)
+    {//stupid control needed to not be confused by the very initial object
+        if(VS(cur,"EnergyKOrder")==0)
+        {
+          if(cur->hook==NULL)
+            INTERACT("hook NULL",v[0]);
+          //        INCRS(cur->hook,"NumK",1); // hook should be the ordering firm
+          //cur1=ADDOBJS(cur->hook,"Capital");
+          //      cur1=cur->hook->add_an_object("Capital");
+          //        if(t>7)
+          //      INTERACTS(cur->hook, "PincoPallo", v[5]);
+          cur1=ADDOBJS(cur->hook,"Capital");
+          WRITELS(cur1,"K",v[5],t);
+          v[9]=VS(cur,"Kproductivity");
+          WRITELS(cur1,"IncProductivity",v[9],t);
+  
+          // Incorporate KEfficiency in the vintage produced IncEfficiency
+          v[90]=VS(cur,"KEfficiency");
+          WRITELS(cur1,"IncEfficiency",v[90],t);
+  
+          WRITELS(cur1,"IncLearningK",0.1,t);
+          WRITELS(cur1,"KAge",0,t);
+          v[11]=VS(cur,"KP");
+          WRITELS(cur1,"KExpenditures",v[11]*v[4], t);
+          cur5=SEARCHS(cur->hook,"BankF");
+          INCRS(cur5,"DebtF",v[4]*v[11]); //sprintf(msg, " KF(%g)\n", v[4]*v[11]); plog(msg);
+          INCRS(cur5->hook,"CapitalDemand",v[4]*v[11]);
+          
+          WRITES(cur->hook,"Waiting",0); //tell the firms it has the new capital
+          SORTS(cur->hook,"Capital","IncProductivity", "DOWN");          
+         }
+        else
+         {//delivery of a K for Energy firm
+          
+          if(cur->hook==NULL)
+            INTERACT("hook NULL KEN",v[0]);
+          cur1=ADDOBJS(cur->hook,"CapitalEF");
+          INCRS(cur->hook, "NumPP", 1);
+          cur2 = ADDOBJS(cur->hook->up, "PP");
+          cur1->hook=cur2;
+          cur2->hook=cur1;
+          v[20] = VS(cur->hook, "MultiplierCapacityEN");
+          WRITES(cur1,"CapitalEN",v[5]);
+          v[9]=VS(cur,"Kproductivity");
+          v[21] = VS(cur->hook, "MultiplierProductivityEN");
+          WRITES(cur1,"KENProductivity",v[9]*v[21]);
+          WRITELS(cur1,"PPKAge",0,t);
+          v[11]=VS(cur,"KP");
+          v[12]=v[11]*v[4];
+          WRITELS(cur1,"KExpendituresEN",v[12], t);
+          INCRS(cur->hook,"DebtEF",v[12]); 
+          
+          WRITES(cur->hook,"WaitingEF",0); //tell the firms it has the new capital
+         }//end delivered to energy firm
+            
+        cur5=SEARCH("BankK");
+        INCRS(cur5,"KRevenues",v[4]*v[11]);
+
+        //      WRITES(cur1,"ResellPrice",v[11]*V("DiscountUsedK"));
+
+        v[20]=INCR("NumOrders",-1);
+        if(v[20]>0)
+          DELETE(cur);
+        else
+        {
+          WRITES(cur,"KAmount",0);
+          WRITES(cur,"KCompletion",0);
+          WRITES(cur,"TimeWaited",0);
+          WRITES(cur,"Kproductivity",0);
+          WRITES(cur,"KEfficiency",0);
+          WRITES(cur, "IdClient", -1);
+          cur->hook=NULL;
+        }
+      }//end control first toke object
+   }//end order completed
+  else
+   {
+    if(v[4]>0)
+      INCRS(cur,"TimeWaited",1); // if orders remain non completed increase the time needed to go through future orders
+   }
+
+}
+
+//v[13]=min(V("KQ"),v[3]);
+//v[15]=V("KQ")-v[3];
+//v[16]=v[15]-v[0];
+//if(v[15]>0 && v[15]!=v[0])
+//INTERACT("check the correspondence between production and KQ",v[16]);
+//if(v[15]<0 && v[0]!=0)
+//INTERACT("check the correspondence between production and KQ",v[0]);
+
+RESULT(v[13] )
+
+
+
 
 EQUATION("AvMaxEfficiency")
 /*
@@ -9,21 +139,6 @@ EQUATION("AvMaxEfficiency")
 v[1]=AVE("MaxEfficiency");
 
 RESULT(v[1] )
-
-EQUATION("AvActualGreenEnergyCost")
-/*
-Weighted average of green energy cost
-*/
-v[0]=V("Suma");
-v[1]=V("GreenEN");
-RESULT(v[0]/v[1] )
-
-EQUATION("Suma")
-/*
-Sum of "a" used to compute the weighted average of green energy AvActualGreenEnergyCost
-*/
-v[0]=SUM("a");
-RESULT(v[0] )
 
 EQUATION("a")
 /*
@@ -43,16 +158,6 @@ RESULT(v[1]/v[2] )
 
 
 
-EQUATION("PriceENGr")
-/*
-*/
-v[2]=VL("priceEN",1);
-v[3]=V("priceEN");
-v[6]=v[3]/v[2]-1; //compute the growth rate of priceEN
-RESULT(v[6] )
-
-
-
 EQUATION("MinWageGr")
 /*
 */
@@ -65,7 +170,7 @@ RESULT(v[7] )
 
 EQUATION("GreenEnergyPriceProd")  // Called by KCapital
 /*
-Compute the investment cost to produce one unit of green energy during the whole life of the vintage. 
+Compute the investment cost to produce one unit of green energy during the whole life of the vintage.
 */
 
 cur1=SEARCHS(p->up,"KFirm");
@@ -74,7 +179,7 @@ v[0]=VS(cur1,"KPrice");
 
 // INTERACT("KPrice",v[0]);
 
-v[1]=V("GreenProductivity"); 
+v[1]=V("GreenProductivity");
 
 // INTERACT("MaxENProduction",v[1]);
 
@@ -113,10 +218,12 @@ EQUATION("aNW")
 
 //if(v[2]<0)
 //	v[2]=0;
-	
+
 v[3]=V("aaNW");
 
 v[4]=V("Vacancies");
+
+
 
 if(v[4]<1)
 	v[4]=1;
@@ -125,18 +232,17 @@ v[5]=v[3]*log(v[4]);
 if(v[5]>1)
 	v[5]=1;
 
-if(v[5]<0.2)
- v[5]=0.2;
-if(v[5]>0.8)
- v[5]=0.8;
- 
-//v[6]=VL("aNW",1);
+if(v[5]<V("aNWmin") )
+ v[5]=V("aNWmin");
+if(v[5]>V("aNWmax"))
+ v[5]=V("aNWmax");
+
+v[6]=VL("aNW",1);
 //INTERACT("aNW 1", v[6]);
-//v[7]=0.1*v[5]+0.9*v[6];
+v[7]=V("aNWsmooth")*v[5]+(1-V("aNWsmooth"))*v[6];
 
-//RESULT(v[3]*log(v[2]+1) ) 
-
-RESULT(v[5] ) 
+//RESULT(v[3]*log(v[2]+1) )
+RESULT(v[7] )
 
 
 
@@ -173,13 +279,6 @@ v[0]=SUM("UnitDemand");
 
 RESULT(v[0] )
 
-EQUATION("TotKNbrWorkers")
-/*
-*/
-v[0]=SUM("KNbrWorkers");
-
-RESULT(v[0] )
-
 EQUATION("AvMarkup")
 /*
 */
@@ -187,10 +286,16 @@ v[0]=AVE("markup");
 
 RESULT(v[0] )
 
+EQUATION("TotKNbrWorkers")
+/*
+*/
+v[0]=SUM("KNbrWorkers");
+
+RESULT(v[0] )
+
 EQUATION("TotKLaborForce")
 /*
 */
-V("Demography");
 v[0]=SUM("KLaborForce");
 
 RESULT(v[0] )
@@ -198,7 +303,6 @@ RESULT(v[0] )
 EQUATION("TotLaborForce")
 /*
 */
-V("Demography");
 v[0]=SUM("LaborForce");
 
 RESULT(v[0] )
@@ -323,29 +427,6 @@ RESULT(v[0]*(1+v[1]) )
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 EQUATION("NbrEngiGreen")
 /*
 */
@@ -373,11 +454,6 @@ RESULT(v[0]/v[1] )
 
 
 
-
-
-
-
-
 EQUATION("GreenENShare")
 /*
 */
@@ -396,78 +472,466 @@ RESULT(v[0]/v[1] )
 
 
 
-EQUATION("TotENCost")
+
+EQUATION("maxCostUnitEnergy")
 /*
-Compute the cost to produce energy with both Green and Oil
+Comment
 */
-v[0]=v[1]=v[2]=v[3]=v[4]=0;
-v[0]=V("GreenEN");
-v[1]=V("AvActualGreenEnergyCost");
-v[2]=V("OilUse");
-v[3]=V("OilPrice");
-v[4]=V("OilProd");
-v[5]=V("TotEnergyConsumption");
-//v[6]=(v[0]*v[1]+v[2]*v[3]*v[4])/(v[5]);
-//v[6]=(v[0]*v[1]+v[2]*v[3]/v[4])/(v[5]);
-v[6]=(v[0]*v[1]+v[2]*v[3])/(v[5]);
+v[0]=-1;
+CYCLE(cur, "EnergyFirm")
+{
+	v[1] = VS(cur, "CostUnitEnergy");
+	if(v[0]< v[1])
+	 v[0]=v[1];
+}
+
+RESULT(v[0] )
+
+
+EQUATION("InitPP")
+/*
+Initalize the objects required to compute the price of energy. A hook links every PP object to a CapitalEF object in one of the energy producers 
+*/
+v[0]=0;
+
+CYCLE(cur, "EnergyFirm")
+{
+	CYCLES(cur, cur1, "CapitalEF")
+		v[0]++;
+}
+
+v[1]=0;
+CYCLE(cur, "PP")
+{v[1]++;
+	
+}
+v[2]=v[0]-v[1];
+if(v[2]>0)
+ ADDNOBJ("PP", v[2]);
+if(v[2]<0)
+ INTERACT("Error in # of PP",v[2]);
+CYCLE(cur, "PP")
+	 WRITELS(cur, "PricePP", -2, 0);
+
+cur2 = SEARCH("PP");
+CYCLE(cur, "EnergyFirm")
+{
+	CYCLES(cur, cur1, "CapitalEF")
+		{
+		 cur2->hook=cur1;
+		 cur1->hook=cur2;
+		 cur2=cur2->next;
+		} 
+}
+
+PARAMETER
+RESULT(1 )
+
+EQUATION("DemographyEN")
+/*
+Comment
+*/
+v[0] = V("MinUtilization");
+CYCLE(cur, "EnergyFirm")
+{
+ v[1]=0;
+	CYCLE_SAFES(cur, cur1, "CapitalEF")
+	{
+		v[2] = VLS(cur1, "MAUtilizationPP",1);
+		if(v[2]<v[0])
+		 {
+		  v[3] = VS(cur, "NumPP");
+		  if(v[3]>1)
+		   {
+		    INCRS(cur, "NumPP", -1);
+		    DELETE(cur1->hook);
+		    DELETE(cur1);
+		    v[1]=1;
+		   }
+		 }
+	 if(v[1]==1)
+	  break;
+	}
+	
+}
+
+RESULT(1 )
+
+EQUATION("priceEN")
+/*
+Uniform price of energy computed as the cost of the marginal firm ranked according to increasing unit costs of production
+*/
+
+V("DemographyEN");
+v[5]=v[0] = V("TotEnergyConsumption");
+WRITE("CopyTotalEnergy", v[0]);
+//CYCLE(cur, "PP")
+	//VS(cur, "PricePP");
+
+SORT("PP", "PricePP", "UP");
+
+v[4]=0;
+v[3]=V("PricePP"); //
+CYCLE(cur, "PP")
+{
+	v[1] = VS(cur->hook,"KENCapacity");
+	v[2]=min(v[0],v[1]);
+	WRITES(cur->hook, "EnergyProductionPP", v[2]);
+	v[0]-=v[2];
+	if(v[0]!=0 )
+	  {
+	   v[3] = VS(cur, "PricePP");//record the price for non-null producers
+   	v[4]+=v[2];
+   }  
+}
+
+//if(v[4]!=v[5])
+ //INTERACT("MISMATCH", v[4]);
+RESULT(v[3])
+
+EQUATION("EnergyProductionEF")
+/*
+Total energy produced by the firm
+*/
+
+V("priceEN");
+v[0]=0;
+CYCLE(cur, "CapitalEF")
+{
+	v[0] += VS(cur, "EnergyProductionPP");
+}
+
+RESULT(v[0] )
+
+EQUATION("MAUtilizationPP")
+/*
+Moving average of PP utilization
+*/
+V("priceEN");//to ensure that the current production is set
+v[0] = VL("MAUtilizationPP", 1);
+v[1] = V("EnergyProductionPP");
+v[4] = V("KENCapacity");
+v[3] = V("SpeedMA");
+v[2]=v[3]*v[0]+(1-v[3])*v[1]/v[4];
+RESULT(v[2] )
+
+EQUATION("ProfitEF")
+/*
+Energy firm profits
+*/
+
+v[0] = V("priceEN");
+v[1] = V("EnergyProductionEF");
+v[2] = V("CapitalCostEF");
+v[3] = V("LaborCostEF");
+RESULT(v[0]*v[1]-v[2]-v[3] )
+
+EQUATION("NetCashEF")
+/*
+Cash revenues for energy firms
+*/
+v[1] = V("ProfitEF");
+v[2] = V("WagePremEF");
+RESULT(v[1]-v[2])
+
+EQUATION("BalanceEF")
+/*
+Comulative cash of energy firms
+*/
+v[0] = VL("BalanceEF", 1);
+v[1] = V("NetCashEF");
+RESULT(v[0]+v[1])
+
+EQUATION("PricePP")
+/*
+Price computed as the markup on the cost of unit of energy
+for this capital unit
+*/
+v[0] = VS(p->hook,"LaborCostEF");
+v[1] = VS(p->hook,"markupEF");
+v[3] = VS(p->hook,"CapitalCostEF");
+v[5] = VS(p->hook, "RequiredWorkersEF");
+v[6] = VS(p->hook,"KENCapacity");
+v[7] = VS(p->hook,"KENProductivity");
+
+v[10] = VS(p->hook, "MaxEnergyCapacity");
+
+v[8]= ((v[6]/v[7])/v[5])*v[0];//labor costs for this plant
+v[9]= v[3]*v[6]/v[10]; //capital costs for this plant
+v[4]=v[1]*(v[8]+v[9])/v[6];
+RESULT(v[4] )
+
+EQUATION("markupEF")
+/*
+Markup for energy firms. Decreases in case of null sales and increases otherwise
+*/
+v[0] = VL("ProfitEF",1);
+v[1] = VL("markupEF", 1);
+v[2] = V("alphaMUEF");
+if(v[0]>0)
+ v[3]=v[2]*v[1]+(1-v[2])*2; //maximum markup=2
+else
+ v[3]=v[2]*v[1]+(1-v[2])*1.2; //minimum markup=1
+  
+RESULT(v[3] )
+
+EQUATION("MaxEnergyCapacity")
+/*
+Maximum capacity
+*/
+
+v[0]=0;
+CYCLE(cur, "CapitalEF")
+{
+	v[1] = VS(cur, "KENCapacity");
+	v[0]+=v[1];
+}
+
+RESULT(v[0] )
+
+EQUATION("CapitalCostEF")
+/*
+Cost of capital, computed as an interest rate applied to the amount of debt for each firm
+*/
+v[0] = VL("BalanceEF",1);
+if(v[0]<0)
+ v[1]=-v[0];
+else
+ v[1]=0;
+ 
+v[2] = V("InterestLoansEF");
+v[3]=v[2]*v[1];
+
+RESULT(v[2]*v[1] )
+
+EQUATION("LaborCostEF")
+/*
+Labor cost of Energy Firms
+*/
+v[0]=0;
+
+CYCLE(cur, "LaborEF")
+ {
+  v[1]=VS(cur,"NumWorkersEF");
+  v[2]=VS(cur,"wageEF");
+  v[0]+=v[1]*v[2];
+ }
+
+RESULT(v[0] )
+
+EQUATION("NumWorkersEF")
+/*
+Number of workers, working for EnergyFirms
+*/
+
+v[15]=0;
+CYCLES(p->up, cur, "LaborEF")
+ { //check how many tiers already exist
+  v[15]++;
+ }
+v[14]=V("IdLaborEF");
+if(v[14]==1)
+ { // compute the first tier workers given their productivity and production needs
+  v[6]=V("RequiredWorkersEF");
+ }
+else
+ {// when above the first tier workers...
+  v[18]=V("IdLaborEF");
+  cur=SEARCH_CNDS(p->up,"IdLaborEF",v[18]-1);
+  v[21]=VS(cur,"nuEF"); //given the worker ratio between tiers (defined by the tier below)
+  v[19]=VS(cur,"NumWorkersEF"); //and the number of workers in the previous tier
+  v[6]=v[19]/v[21]; // compute the required executives for the current tier
+  v[17]=V("nuEF");
+  if(v[6]>=v[17] && v[18]==v[15])
+   { // if they are above the workers ratio of this tier and this is the last tier, create a new working class
+    cur1=ADDOBJ_EXS(p->up,"LaborEF",p);
+    WRITES(cur1,"IdLaborEF",v[18]+1);
+    v[20]=v[6]/v[17];
+    WRITELS(cur1,"NumWorkersEF",v[20], t);
+    WRITELLS(cur1,"NumWorkersEF",0, t,1); // write also that the number of workers in the previous period is equal to 0, as it is used in the inequality statistics
+    cur3=SEARCH_CND("NumClass",v[18]+1);
+    cur1->hook=cur3;
+   }
+  if(v[18]>2 && v[19]<v[21])
+   v[6]=0;
+ }
+
 
 RESULT(v[6] )
 
 
-EQUATION("priceEN")
+EQUATION("wageEF")
 /*
+Wage of the workers in this layer of the firm
 */
-//v[0]=VS(p->up,"TotENCost");
-v[0]=V("TotENCost");
-//INTERACT("TotENCost /g",v[0]);
+v[5]=V("NumWorkersEF");
+v[2]=V("IdLaborEF");
+if(v[2]==1)
+ { // first tier workers
+  v[0]=V("MinWage");
+  v[1]=V("wagecoeffEF"); // wage coefficient as the minimum wage multiplier
+ }
+else
+ { // executives
+  cur=SEARCH_CNDS(p->up,"IdLaborEF",v[2]-1);
+  v[0]=VS(cur,"wageEF");
+  v[1]=V("wagecoeffEF"); // wage coefficient as the wage tier multiplier
+ }
+
+VS(p->hook,"PayTime");
+INCRS(p->hook,"Individuals",v[5]);
+INCRS(p->hook,"WageIncome",v[5]*v[0]*v[1]);
+
+RESULT((v[0]*v[1]) )
+
+EQUATION("WagePremEF")
+/*
+Wage premia distributed, when available to all classes of executives.
+*/
+
+v[0]=V("ProfitEF");
+
+v[2]=V("roPremiaEF");
+v[5]=max(0,(v[0])*v[2]);
+v[3]=0;
+
+if(v[5]>0)
+ {
+  CYCLE(cur, "LaborEF")
+   {
+    v[10]=VS(cur,"IdLaborEF");
+    if(v[10]>1)
+     {
+      v[2]=VS(cur,"wageEF");
+      v[3]+=v[2];
+     }
+   }
+
+  CYCLE(cur, "LaborEF")
+   {
+    v[10]=VS(cur,"IdLaborEF");
+    if(v[10]>1)
+     {v[2]=VS(cur,"wageEF");
+      WRITES(cur,"PremiaEF",v[5]*v[2]/v[3]);
+      INCRS(cur->hook,"PremiaIncome",v[5]*v[2]/v[3]);
+     }
+   }
+ }
+
+RESULT(v[5] )
+
+EQUATION("RequiredWorkersEF")
+/*
+Compute the number of workers for the energy firms
+*/
+
+v[0]=0;
+CYCLE(cur, "CapitalEF")
+{
+ v[1] = VS(cur, "KENProductivity");
+ v[2] = VS(cur, "CapitalEN");	
+ v[0] +=v[2]/v[1];
+}
+
+RESULT(v[0] )
+
+EQUATION("priceENXXX")
+/*
+Attempt to compute the price of energy and allocate energy share based in the cost of energy
+
+*/
+v[1]=v[0] = V("TotEnergyConsumption");
+v[3] = V("aCompetitionEnergy");
+v[4] = V("maxCostUnitEnergy")*1.1;
+v[6]=0;
+CYCLE(cur, "PowerPlant")
+{
+	v[2] = VS(cur, "CostUnitEnergy");
+	v[5]=pow(v[4]-v[2],v[3]);
+	v[6]+=v[5];
+	WRITES(cur,"PPapp", v[5]);
+	
+}
+
+
+CYCLE(cur, "PowerPlant")
+{
+ 	v[7] = VS(cur, "MaxEnergyCapacity");
+ 	v[8] = VS(cur, "PPapp");
+ 	v[9]=v[8]*v[0]/v[6];//share of energy for the firm
+ 	v[10]=min(v[9],v[7]);//share of energy that the firm can produce
+ 	if(v[9]!=v[10])
+ 	{//allocation saturated capacity
+  	v[11]+=v[9]-v[10];//extra energy that the firm cannot produce
+  	v[12]+=v[8];
+  	WRITES(cur, "PPapp", 0);
+
+  }	
+ 	WRITES(cur, "EnergyProduced", v[10]);
+ 	v[1]-=v[10];
+}
+v[13]=1;
+while(v[11]>0 && v[13]==1)
+ {v[6]-=v[12];
+  v[11]=v[12]=v[13]=0;
+  CYCLE(cur, "PowerPlant")
+  {
+   	v[7] = VS(cur, "MaxEnergyCapacity") - VS(cur, "EnergyProduced");
+   	v[8] = VS(cur, "PPapp");
+   	v[9]=v[8]*v[11]/v[6];//share of energy for the firm
+   	v[10]=min(v[9],v[7]);//share of energy that the firm can produce
+   	if(v[9]!=v[10])
+   	 {
+    	 v[11]+=v[9]-v[10];//extra energy that the firm cannot produce
+    	 v[12]+=v[8];
+ 	  	 WRITES(cur, "PPapp", 0);
+     }
+    else
+     v[13]=1; 	
+   	INCRS(cur, "EnergyProduced", v[10]);
+   	v[1]-=v[10];
+  }    
+ 
+ }
+if(v[13]==0)
+ INTERACT("Insufficient Energy Capacity", v[1]);
 RESULT(v[0] )
 
 
-EQUATION("MaxEnergyEfficiency")
+EQUATION("EN")
 /*
-Defines the Theoretical Energy Efficiency of the Firm as incorporated in the various capital vintages of the firm.
+Compute the energy used in production
 */
 
-v[10]=V("CapitalStock");
+v[10]=V("Q");
 v[0]=0;
 v[1]=0;
 v[2]=V("CapitalDepress");//defines the depression rate of capital
 
-CYCLE_SAFE(cur, "Capital")
+CYCLE(cur, "Capital")
  {
   v[3]=VS(cur,"K");
   v[4]=VS(cur,"KAge");
-    v[5]=VS(cur,"IncEfficiency");
+  v[5]=VS(cur,"IncEfficiency");
+  v[8] = VS(cur, "IncProductivity");
   v[6]=pow((1-v[2]),v[4]);//computes the depreciation of capital
-  v[7]=v[3]*v[6];//computes the actual stock of this capital vintage that can be used 
-
-    v[0]+=(v[7]*v[5]);
-    v[1]+=v[7];
+  v[7]=v[3]*v[6];//computes the actual stock of this capital vintage that can be used
+  v[9]=v[6]*v[8]; //max production with this capital vintage
+  v[11]=min(v[10], v[9]);//actual production with this vintage
+  v[10]-=v[11]; //remaining production
+  v[0]+=v[11]*v[5];//energy consumed by this vintage
 }
-v[8]=v[0]/v[1];//Max Energy Efficiency computed as the weighted average of the incorporated efficiency in every capital vintages
 
-RESULT(v[8] )
-
-EQUATION("EN")
-/*
-Compute the energy used by final good firms
-*/
-v[0]=V("Q");
-v[1]=V("MaxEnergyEfficiency");
-RESULT(v[0]/v[1] )
+RESULT(v[0] )
 
 EQUATION("UnitEnergyCost")
 /*
-comment
+Cost of energy for unit of output
 */
 
 v[3]=VL("EN",1);
 v[4]=VL("priceEN",1);
 v[5]=VL("Q",1);
-
-//v[3]=V("EN");
-//v[4]=V("priceEN");
-//v[5]=V("Q");
 
 if(v[5]>0.01)
  {
@@ -492,7 +956,7 @@ v[6] = V("aClearingPrice");
 if(v[3]+v[4]==0)
  v[5]=-1;
 else
- v[5]=v[0]*(1+v[6]*(v[3]-v[4])*2/(v[3]+v[4])); 
+ v[5]=v[0]*(1+v[6]*(v[3]-v[4])*2/(v[3]+v[4]));
 RESULT(v[5] )
 
 EQUATION("price")
@@ -502,26 +966,10 @@ Markup on the unit production cost
 v[10]=V("markup");
 v[22]=V("UnitLaborCost"); // labour in the first tier (the ones which define the production capacity)
 
-v[1]=V("PTrend");
-v[2]=VL("price",1);
-
-v[3]=VL("EN",1);
-v[4]=VL("priceEN",1);
-v[5]=VL("Q",1);
-
 v[6]=V("UnitEnergyCost");
 
-//v[14]=v[10]*v[22];
 v[14]=v[10]*(v[22]+v[6]); // add the energy cost to the pricing equation
 
-/*
-v[17] = V("sPrice");
-v[15] = V("ClearingPrice");
-if(v[15]==-1)
- v[16]=v[14];
-else
- v[16]=v[14]*v[17]+(1-v[17])*v[15]; 
-*/ 
 RESULT(v[14] )
 
 EQUATION("KEN")
@@ -555,7 +1003,7 @@ EQUATION("KPrice")
 Comment
 */
 v[0]=V("Kmarkup");
-v[8]=V("KQ"); // productive capacity of the firm 
+v[8]=V("KQ"); // productive capacity of the firm
 v[4]=V("LaborCostK");
 v[1]=V("KUnitEnergyCost");
 v[7]=(v[0])*(v[4]/v[8]+v[1]);
@@ -620,15 +1068,15 @@ CYCLE_SAFE(cur, "Capital")
   v[3]=VS(cur,"K");
   v[4]=VS(cur,"KAge");
   v[5]=pow((1-v[1]),v[4]);//computes the depressiation of capital
-  v[6]=v[3]*v[5];//computes the actual stock of this capital vintage that can be used 
-  
+  v[6]=v[3]*v[5];//computes the actual stock of this capital vintage that can be used
+
 //  if(v[6]>1) // Scrap if absolute value is below 1
 if(v[6]/v[0]>0.01) // Scrap if relative value is low
    {
     v[10]+=v[6];
    }
   else
-   DELETE(cur); 
+   DELETE(cur);
  }
 //if(v[10]==0)
  //INTERACT("Merde 2", v[6]);
@@ -641,7 +1089,6 @@ EQUATION("KNbrEngiProd")
 /*
 Defines the number of engineers working on productivity
 */
-V("KSpecialization");
 
 v[0]=VL("KNbrEngineers",1);
 v[1]=V("KShareEngiProd");
@@ -653,7 +1100,6 @@ EQUATION("KNbrEngiEff")
 /*
 Defines the number of engineers working on efficiency
 */
-V("KSpecialization");
 
 v[0]=VL("KNbrEngineers",1);
 v[1]=V("KShareEngiEff");
@@ -665,7 +1111,6 @@ EQUATION("KNbrEngiProductionEff")
 /*
 Defines the number of engineers working on process efficiency
 */
-V("KSpecialization");
 
 v[0]=VL("KNbrEngineers",1);
 v[1]=V("KShareEngiProductionEff");
@@ -677,7 +1122,6 @@ EQUATION("CurrentProductivity")
 /*
 Changes in the productivity of kapital thanks to R&D
 */
-//V("InvestmentDecision");
 
 v[0]=VL("CurrentProductivity",1);
 v[1]=V("KNbrEngiProd");
@@ -703,7 +1147,6 @@ EQUATION("CurrentEfficiency")
 /*
 Changes in the efficiency of kapital thanks to R&D
 */
-//V("InvestmentDecision");
 
 v[0]=VL("CurrentEfficiency",1);
 v[1]=V("KNbrEngiEff");
@@ -729,7 +1172,6 @@ EQUATION("KMaxEnergyEfficiency")
 /*
 R\&D to improve the energy efficiency of capital good production
 */
-//V("InvestmentDecision");
 
 v[0]=VL("KMaxEnergyEfficiency",1);
 v[1]=V("EnergyEfficiencyShock");
@@ -771,6 +1213,7 @@ else
 {v[11]=v[0];}
 
 RESULT(v[11] )
+
 EQUATION("betaProd")
 /*
 compute the value of betaEff depending on the relative changes of energy price and minimum wage.
@@ -783,67 +1226,22 @@ v[2]=V("betaTime");
 v[10]=1-v[0]-v[1]-v[2];
 RESULT(v[10] )
 
-
-EQUATION("GreenVintageStock")
-/*
-compute the stock of green capital
-*/
-
-v[0]=V("GreenK");
-v[2]=V("GreenKAge");
-v[3]=V("GreenCapitalDep");
-v[5]=v[0]*pow((1-v[3]),v[2]);
-if(v[5]==0)
-	v[5]=0.0001; // avoid division by zero
-
-RESULT(v[5] )
-
-EQUATION("GreenCapitalStock")
-/*
-Sum of GreenVintageStock
-*/
-v[0]=SUM("GreenVintageStock");
-
-RESULT(v[0] )
-
-
-
-
-EQUATION("GreenKAge")
-v[0]=VL("GreenKAge",1);
-RESULT((v[0]+1) )
-
-
-
-
-EQUATION("BalanceE")
-/*
-Compute Revenues of the Energy sector and add them to BalanceE
-*/
-
-v[0]=V("TotEnergyConsumption");
-v[1]=V("priceEN");
-v[2]=VL("BalanceE",1);
-v[3] = V("OilIncomeReturned");
-RESULT(v[2]+v[0]*v[1]+v[3] )
-
-
 EQUATION("MoAvGreenInvestment")
 /*
-Comment 
+Comment
 */
 
 v[0]=V("GreenInvestment");
 v[1]=VL("GreenInvestment",1);
 
-v[2]= 0.9*v[1]+0.1*v[0]; 
+v[2]= 0.9*v[1]+0.1*v[0];
 
 RESULT(v[2] )
 
 
 EQUATION("MoAvGreenInvestmentGr")
 /*
-Comment 
+Comment
 */
 v[0]=V("MoAvGreenInvestment");
 v[1]=VL("MoAvGreenInvestment",1);
@@ -857,7 +1255,7 @@ RESULT(v[2] )
 
 EQUATION("MoAvInvestment")
 /*
-Comment 
+Comment
 */
 
 v[0]=SUM("KProductionFlow");
@@ -870,7 +1268,7 @@ RESULT(v[2] )
 
 EQUATION("MoAvInvestmentGr")
 /*
-Comment 
+Comment
 */
 
 v[0]=V("MoAvInvestment");
@@ -884,7 +1282,7 @@ RESULT(v[3] )
 
 EQUATION("MoAvMinWageGr")
 /*
-Comment 
+Comment
 */
 
 v[0]=VL("MinWage",1);
@@ -898,57 +1296,6 @@ v[4]= 0.99*v[3]+0.11*v[2];  // MoAvMinWageGr
 
 RESULT(v[4] )
 
-EQUATION("ProbToSwitch")
-/*
-  Comment 
-*/
-  
-//v[0]=VS(p->up,"MoAvGreenInvestmentGr");
-//INTERACT("MoAvGreenInvestmentGr",v[0]);
-
-//v[1]=VS(p->up,"MoAvInvestmentGr");
-//INTERACT("MoAvInvestmentGr",v[1]);
-
-v[0]=V("MoAvGreenInvestment");
-v[1]=VL("MoAvGreenInvestment",1);
-if(v[1]==0)
-	v[1]=1;
-	
-v[2]=VL("NbrGreenKInno",1);
-if(v[2]==0)
-	v[2]=1;
-
-v[3]=(v[0]/v[1]-1)/v[2]; // weighted growth rate of MoAvGreenInvestment
-
-v[4]=V("MoAvInvestment");
-v[5]=VL("MoAvInvestment",1);
-if(v[5]==0)
-	v[5]=0.0001;
-	
-v[6]=COUNT("KFirm")-VL("NbrGreenKInno",1);
-if(v[6]==0)
-	v[6]=1;
-
-v[7]=(v[4]/v[5]-1)/v[6]; // weighted growth rate of MoAvInvestment
-
-
-if(V("KShareGreenKProd")==0)
-  { // the kfirm currently focuses its R&D on final good firms
-  v[10]=(v[7]-v[3]);
-  if(v[10]>0) //if investment grows faster than green inv, there is no reason to switch
-  	v[10]=0;
-  }
-else
-  { // the kfirm currently focuses its R&D on energy productivity of solar panels
-  v[10]=(v[3]-v[7]);
-  if(v[10]>0) //investment grows faster than green inv, there is no reason to switch
-  	v[10]=0;
-  }
-//INTERACT("v2",v[2]);
-
-v[20]=1-exp(v[10]); // proba to switch specialization
-
-RESULT(v[20] )
 
 
 
@@ -970,69 +1317,6 @@ RESULT(v[20] )
 
 
 
-
-
-EQUATION("KSpecialization")
-/*
-Comment 
-*/
-  if (V("KShareEngiProductionEff")+V("KShareEngiEff")+V("KShareEngiProd")+V("KShareGreenKProd")!=1)
-  { 
-  INTERACT("start Sum of share != 1",v[1]);
-  }
-  
-v[0]=V("KShareEngiProductionEff");
-v[1]=V("KShareEngiEff");
-
-if(RND<V("ProbToSwitch"))
-  {
-  if(V("KShareGreenKProd")==0)
-    { // the kfirm currently focuses its R&D on final good firms and wants to switch
-    WRITE("KShareEngiEff",0);
-    WRITE("KShareEngiProd",0);
-    WRITE("KShareGreenKProd",1-v[0]);
-    //INTERACT("KSpeE",v[1]);
-
-    }
-  else
-    { // the kfirm currently focuses its R&D on energy productivity of solar panels and wants to switch
-    v[2]=VL("priceEN",1);
-    v[3]=V("priceEN");
-    v[4]=VL("MinWage",1);
-    v[5]=V("MinWage");
-    v[6]=v[3]/v[2]-1; //compute the growth rate of priceEN
-    v[7]=v[5]/v[4]-1; //compute the growth rate of MinWage
-    v[20]=V("psi_spe");
-    v[10]=v[1]*(1+(v[6]-v[7])*v[20]);   //INTERACT("start v10",v[10]);
-    if((v[10]+v[0]+V("KShareEngiProd"))>1 || v[10]<0)
-    	{
-    	v[10]=1-v[0]-V("KShareEngiProd");
-    	  //INTERACT("if v10",v[10]);
-    	}
-    	
-    WRITE("KShareEngiEff",v[10]);
-    WRITE("KShareEngiProd",1-v[0]-v[10]);
-    WRITE("KShareGreenKProd",0);
-    //INTERACT("KSpeF",v[1]);
-    }
-  }
-if (V("KShareEngiProductionEff")+V("KShareEngiEff")+V("KShareEngiProd")+V("KShareGreenKProd")!=1)
-  INTERACT("end Sum of share != 1",v[1]);
-  
-if (V("KShareEngiProductionEff")>1 || V("KShareEngiProductionEff")<0)
-  INTERACT("KShareEngiProductionEff out",v[1]);
-  
-if (V("KShareEngiEff")>1 || V("KShareEngiEff")<0)
-  INTERACT("KShareEngiEff out",v[1]);
-  
-if (V("KShareEngiProd")>1 || V("KShareEngiProd")<0)
-  INTERACT("KShareEngiProd out",v[1]);
-  
-if (V("KShareGreenKProd")>1 || V("KShareGreenKProd")<0)
-  INTERACT("KShareGreenKProd out",v[1]);
-  
-RESULT(1 )
-  
 
 
 
@@ -1059,7 +1343,6 @@ EQUATION("KNbrGreenKProd")
 /*
 Defines the number of engineers working on solar panel productivity
 */
-VL("KSpecialization",1);
 v[0]=VL("KNbrEngineers",1);
 v[1]=V("KShareGreenKProd");
 v[2]=v[0]*v[1];
@@ -1079,7 +1362,6 @@ EQUATION("GreenProductivity")
 /*
 Changes in the productivity of solar panel thanks to R&D
 */
-//V("InvestmentDecision");
 
 v[0]=VL("GreenProductivity",1);
 v[1]=V("KNbrGreenKProd");
@@ -1112,7 +1394,7 @@ compute green energy produced by a green vintage
 */
 
 v[0]=V("GreenK");
-v[1]=V("GreenIncProductivity");
+v[1]=V("GreenVintageProductivity");
 v[2]=V("GreenKAge");
 v[3]=V("GreenCapitalDep");
 v[4]=V("alpha");
@@ -1124,58 +1406,10 @@ RESULT(v[5] )
 
 
 
-EQUATION("GreenEN")
-/*
-compute green energy produced
-*/
-
-v[0]=SUM("GreenVintageEN");
-
-RESULT(v[0] )
-
-
-
-EQUATION("MaxENProduction") // Called by KCapital
-/*
-Compute the energy production of a new vintage for its whole lifespan
-*/
-
-
-V("CallMinGreenId");
-
-v[0]=V("GreenProductivity");
-cur1=SEARCHS(p->up->up->up,"Energy");
-v[2]=VS(cur1,"GreenCapitalDep"); // depreciation of green K 
-v[3]=VS(cur1,"MaxGreenKAge"); // life expectency of green capital
-
-v[4]=VS(cur1,"MinGreenId");
-v[5]=VS(cur1,"alphaFactor");
-v[6]=VS(cur1,"maxAlpha");
-
-v[7]=v[6]*pow(1-v[5],v[4]); // compute alpha
-
-v[8]=v[7]*v[0]*((1-v[2])-pow(1-v[2],v[3]+1) )/v[2];
-
-RESULT(v[8] )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 EQUATION("GreenEnergyCost")  // Called by KCapital
 /*
-Compute the investment cost to produce one unit of green energy during the whole life of the vintage. 
+Compute the investment cost to produce one unit of green energy during the whole life of the vintage.
 */
 
 cur1=SEARCHS(p->up,"KFirm");
@@ -1184,7 +1418,7 @@ v[0]=VS(cur1,"KPrice");
 
 // INTERACT("KPrice",v[0]);
 
-v[1]=V("MaxENProduction"); 
+v[1]=V("MaxENProduction");
 
 // INTERACT("MaxENProduction",v[1]);
 
@@ -1194,21 +1428,8 @@ RESULT(v[2] )
 
 
 
-EQUATION("KGreenSpe") // Called by KFirm
-/*
-Define if the KFirm is specialized in greenK if its green energy cost is below average
-*/
 
-cur=SEARCHS(p->up->up,"Country");
-v[0]=VS(cur,"AvGreenProductivity");
-v[1]=V("GreenProductivity");
-//if(v[1]<=v[0] && V("KNbrGreenKProd")>0)
-if(v[1]>=v[0])
-	v[2]=1;
-else
-	v[2]=0;
 
-RESULT(v[2] )
 
 
 
@@ -1236,80 +1457,15 @@ RESULT(v[2] )
 
 
 
-EQUATION("AvSpe") // Called by Country
-/*
- Compute the average energy cost to produce green energy of specialized KFirms
- */
-v[0]=v[1]=v[2]=v[3]=v[10]=v[11]=v[20]=v[21]=v[22]=v[30]=v[31]=v[32]=v[40]=v[41]=v[42]=0;
-CYCLE(cur,"KFirm")
-{
-  V("KGreenSpe"); // make sure KFirms that can access the market are above average
-  if(VS(cur,"KGreenSpe")==1 )
-  {
-    v[1]=VS(cur,"GreenEnergyCost");
-    v[20]=VS(cur,"GreenProductivity");
-    v[30]=VS(cur,"KPrice");
-    v[40]=VS(cur,"MaxENProduction");
-    
-    // begin consistency check
-    cur1=SEARCHS(cur,"KCapital");
-    v[10]=VS(cur1,"GreenEnergyCost");
-    if(v[1]!=v[10])
-    {INTERACT("consistency issue GreenEnergyCost",v[10]);}
-    v[11]=VS(cur1,"GreenProductivity");
-    if(v[20]!=v[11]){INTERACT("consistency issue GreenProductivity",v[11]);}
-    v[12]=VS(cur1,"KPrice");
-    if(v[30]!=v[12]){INTERACT("consistency issue KPrice",v[12]);}
-    v[13]=VS(cur1,"MaxENProduction");
-    if(v[40]!=v[13]){INTERACT("consistency issue MaxENProduction",v[13]);}
-    // end consistency check
-    
-    v[0]=v[0]+v[1]; // sum of energy cost
-    v[21]=v[21]+v[20]; // sum of green productivity
-    v[31]=v[31]+v[30]; // sum of KPrice
-    v[41]=v[41]+v[40]; // sum of MaxENProduction
-    v[2]=v[2]+1; // number of specialised firms
-  }  
-}
 
-if(v[2]==0)
-{
-  INTERACT("zero spe KFirm ",v[2]); // check if there is at least one specilised firm
-  //END_EQUATION(666 );
-}
-else
-{
-  v[3]=v[0]/v[2];
-  v[22]=v[21]/v[2];
-  v[32]=v[31]/v[2];
-  v[42]=v[41]/v[2];
-  v[52]=v[51]/v[2];
-}
-WRITE("AvGreenEnergyCostSpe",v[3]);
-WRITE("AvGreenProductivitySpe",v[22]);
-WRITE("AvGreenKPriceSpe",v[32]);
-WRITE("AvMaxENProduction",v[42]);
-WRITE("NbrGreenKInno",v[2]);
 
-RESULT(1 )
-  
-  
-  
-  
-  
 
 
 
 
 
 
-EQUATION("AvGreenProductivity") // Called by Country
-/*
-	Compute the average green productivity
-*/
-v[0]=AVE("GreenProductivity");
 
-RESULT(v[0] )
 
 
 
@@ -1339,16 +1495,6 @@ RESULT(v[0] )
 
 
 
-
-EQUATION("NbrKGreenSpe") // Called by Country
-/*
-*/
-
-v[0]=SUM("KGreenSpe");
-if(v[0]<1)
-	INTERACT("zero KGreenSpe",v[0]);
-
-RESULT(v[0] )
 
 
 
@@ -1407,144 +1553,10 @@ RESULT(v[4] )
 
 
 
-EQUATION("PlaceGreenOrder") // Called by energy
-/*
- */
-if(V("GreenInvestment")<0.1)
-  END_EQUATION(1); // stop
-
-v[1]=V("AvGreenEnergyCostSpe");
-v[2]=V("OilPrice");
-v[3]=V("OilProd");
-v[4]=v[2]/v[3]; // Unit cost to produce dirty energy
-
-v[5]=V("GreenInvestment"); 
-
-cur2 = SEARCHS( p->up, "Energy" );
-WRITES(cur2, "LocalGreenInvestmentOrder",0);
-
-
-//sprintf(msg, "\n PlaceGreenOrder"); plog(msg); 
-
-
-// local cost < RoW cost 
-  //  sprintf(msg, "\n local %g < RoW %g ", v[1], v[0] ); plog(msg);
-  
-  if(v[1]<v[4] ) // 2. Check if green cheaper than dirty
-  { // if green cheaper than dirty, buy from local 
-    
-    //sprintf(msg, "\n local green %g cheaper than dirty %g", v[1], v[4] );	plog(msg);
-    
-    v[31]=V("GreenInvestment");
-    //sprintf(msg, "\n PlaceGreeeOrder GreenInvestment %g ", v[31] ); plog(msg);
-    // GreenGrade is computed in its own equation now
-    cur3=SEARCHS(p->up,"Machinery");
-    v[71]=SUMS(cur3,"GreenGrade"); 
-    
-    CYCLE(cur1,"KFirm")
-    {
-      v[75]=VS(cur1,"GreenGrade");
-      v[72]=v[75]/v[71]; // Share of GreenInvestment
-      v[73]=v[72]*v[31]; // GreenKamount
-      WRITES(cur1,"GreenKAmount",v[73]);
-      
-      // Now, we know the amount of greenK bought to each KFirm, we can place orders
-
-      if(v[73]>0)
-      {
-        if(VS(cur1, "NumOrders")==0)
-          cur2 = SEARCHS(cur1, "Order");
-        else  
-          cur2=ADDOBJS(cur1,"Order"); // add a new instance of Order to KFirm
-        
-        if(cur2==NULL)
-          INTERACT("cur2 NULL",v[73]);
-        
-        v[1]=VLS(cur1,"KPrice",1);
-        WRITES(cur2,"GreenOrder",1);
-        //WRITES(cur2,"KAmount",v[73]);
-        
-        WRITES(cur2,"KAmount",v[73]);
-        //sprintf(msg, "\n PlaceGreeeOrder KAmount %g ", v[73] ); plog(msg);
-        
-        
-        WRITES(cur2,"KCompletion",0);
-        WRITES(cur2,"TimeWaited",1);
-        INCRS(cur1,"NumOrders",1); //cur1 = KFirm
-        
-        //v[2]=VLS(cur,"GreenProductivity",1); //current state of the K art
-        cur=SEARCHS(cur1,"KCapital");
-        v[2]=VLS(cur,"GreenProductivity",1); //current state of the K art
-        
-        WRITES(cur2,"GreenKProd",v[2]); //tech characteristics of the capital stock order
-        WRITES(cur2,"KP",v[1]);// write the price of the capital in the period in which it is ordered, and use it to compute the actual expenditure using the `agreed' price.
-        v[3]=VS(c,"IdEnergy");
-        V("CallMinGreenId");
-        
-        v[24]=V("MinGreenId");
-        //sprintf(msg, "\n minGreenId %g", v[24] ); plog(msg);
-        WRITES(cur2,"OrderGreenId",v[24]);
-        v[25]=V("MinAlpha");
-        WRITES(cur2,"OrderAlpha",v[25]);
-        WRITES(cur2,"IdClient",v[3]);
-        
-        cur2->hook=c; //useful to retrieve quickly the energy object
-      }
-    }
-  }
-  else
-  {
-    //sprintf(msg, "\n local green %g more expansive than dirty %g", v[1], v[4] ); plog(msg);
-    END_EQUATION(1); // stop   	
-  }
-  
-
-
-RESULT(1 )
-  
-  
-  
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
 
 
-  
-  
 
 
-  
-  
-  
-  
-  
-  
-  
-  
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-  
 
 
 
@@ -1554,8 +1566,6 @@ RESULT(1 )
 
 
 
-    
-    
 
 
 
@@ -1570,91 +1580,18 @@ RESULT(1 )
 
 
 
-  
-  
 
 
 
 
-EQUATION("GreenGrade") // Called by 
-/*
-Comment   
-*/
 
 
-// Build an index to distribute demand across KFirms
-v[50]=v[51]=v[52]=v[90]=0;
 
 
-// Use CYCLE to compute averages
-CYCLE(cur1,"KFirm")
-{
-  //sprintf(msg, "\n IdKFirm %g", VS(cur1,"IdKFirm") ); plog(msg);
-  if(cur1==NULL)
-    INTERACT("cur NULL",v[50]);
-  cur=SEARCHS(cur1,"KCapital");
-  if(cur==NULL)
-    INTERACT("cur NULL",v[40]);
-  v[5]=VS(cur1,"KGreenSpe");
-  if(v[5]==1)
-  {
-    v[40]=VS(cur,"GreenProductivity");
-    //sprintf(msg, "\n GreenProductivity %g", v[40] ); plog(msg);
-    
-    v[50]=v[50]+v[40];
-    v[41]=VS(cur1,"KPrice");
-    //sprintf(msg, "\n KPrice %g", v[41] ); plog(msg);
-    v[51]=v[51]+v[41];
-    v[42]=VS(cur1,"WaitTime");	
-    v[52]=v[52]+v[42];
-    v[90]++;
-  }
-}
 
-v[80]=v[50]/v[90]; // Av GreenProductivity           
-v[81]=v[51]/v[90]; // Av KPrice
-v[82]=v[52]/v[90]; // Av WaitTime
-//sprintf(msg, "\n Av GreenProductivity %g", v[80] ); plog(msg);
 
 
-  v[5]=V("KGreenSpe");
-  if(v[5]==1)
-  {
-    //sprintf(msg, "\n IdKFirm %g", VS(cur1,"IdKFirm") ); plog(msg);
-    
-    //cur=SEARCH("KCapital");
-    //v[40]=VS(cur,"GreenProductivity");
-    
-    // Test without search
-    v[40]=V("GreenProductivity");
-    
-    //sprintf(msg, "\n GreenProductivity %g", v[40] ); plog(msg);
-    v[41]=V("KPrice");
-    //sprintf(msg, "\n KPrice %g", v[41] ); plog(msg);
-    v[42]=V("WaitTime");	
-    //sprintf(msg, "\n WaiTime %g", v[42] ); plog(msg);
-    
-    v[60]=v[40]/v[80]; // Normalize GreenProductivity 
-    //sprintf(msg, "\n Normalized green producitivity %g", v[60] ); plog(msg);
-    v[61]=v[41]/v[81]; // Normalize KPrice
-    //sprintf(msg, "\n Normalized KPrice %g", v[61] ); plog(msg);
-    v[62]=v[42]/v[82]; // Normalize WaitTime
-    //sprintf(msg, "\n Normalized time %g", v[62] ); plog(msg);
-    v[70]=pow(v[60],0.33333)*pow(v[61],-0.33333)*pow(v[62],-0.33333); //grade of KFirms /!\ pow(v[xx],1/3) always return 1.
-    //sprintf(msg, "\n test %g", pow(v[60],(0.33333)) ); plog(msg);
-    
-    v[0]=v[70];
-    //WRITES(cur1,"GreenGrade",v[70]);
-    //sprintf(msg, "\n GreenGrade %g", v[70] ); plog(msg);
-  }
-  else
-  {
-    v[0]=0;
-    //WRITES(cur1,"GreenGrade",0);
-  }
 
-  RESULT(v[0] )
-    
 
 
 
@@ -1675,7 +1612,6 @@ v[82]=v[52]/v[90]; // Av WaitTime
 
 
 
-  
 
 
 
@@ -1697,219 +1633,42 @@ v[82]=v[52]/v[90]; // Av WaitTime
 
 
 
-EQUATION("KProductionFlow")
-/*
- 
- */
 
-cur6=SEARCHS(p->up->up,"Energy"); 
-if(cur6==NULL)
-  INTERACT("cur6 NULL",1);
-//WRITES(cur6,"LocalGreenInvestment",0);
 
-//Activity of the K producing firm
-v[0]=V("KQ"); //production capacity of the firm
-v[1]=V("NumOrders");
-if(v[1]==0)
-  END_EQUATION(0);
-v[2]=v[0]/v[1]; //one way to determine the amount of K production capacity per order. Otherwise...
 
-v[3]=0;
-CYCLE(cur, "Order")
-{
-  v[4]=VS(cur,"KAmount");
-  v[5]=VS(cur,"KCompletion");
-  v[3]+=v[4]-v[5];
-}
-cur5=SEARCH("BankK");
-WRITES(cur5,"KRevenues",0);
 
-CYCLE_SAFE(cur, "Order")
-{//increase the level of advancement of the orders and, if completed, remove the order. Given the production capacity, devote it respecting oreders' order (first comes first go, which allows to respect the priority given by customers, on side, and to reduce the dofferences between the price agreed upon ordering and the price at which the kapital is sold)
-  v[4]=VS(cur,"KAmount");
-  v[5]=VS(cur,"KCompletion");
-  v[6]=(v[4]-v[5]); // given the missing quantity of the current order
-  //v[7]=v[6]*v[0]; //share of production capacity devoted to this order
-  v[8]=min(v[0], v[4]-v[5]); //use the production capacity needed actually neded to produce the order, or exhaust here the production capacity (for the current period)
-  INCRS(cur,"KCompletion",v[8]);
-  v[0]=v[0]-v[8];
-  v[5]=VS(cur,"KCompletion"); //update the completion level  in order to cancel the order if done
-  if(v[5]>=v[4])
-  {//order fulfilled. Either search for the ordering firm, or simply use the hook
-    if(v[5]>0)
-    {//stupid control needed to not be confused by the very initial object
-      if(VS(cur,"GreenOrder")==1)
-      {// Order is a GreenOrder
-        
-        V("CallMinGreenId");
-        // Check is minGreenId < MAX(GreenId) to know if there is an available location
-        v[30]=VS(cur,"MinGreenId");
-        //sprintf(msg, "\n MinGreenId %g", v[30]); plog(msg);  
-        v[31]=MAX("GreenId");
-        //sprintf(msg, "\n MAX GreenId %g", v[31]); plog(msg);  
-        v[32]=VS(cur,"MinAlpha");
-        
-        if(v[30]<v[31])
-        {// if there is a free GreenId (GreenK=0), place here the new green vintage
-          cur1=SEARCH_CND("GreenId", v[30]);
-          //sprintf(msg, "there is a free GreenId (GreenK=0)", v[31]); plog(msg);
-        }
-        else
-        {// if there is no free GreenId (GreenK != 0), create a new Id
-          cur1=ADDOBJS(cur->hook,"GreenCapital");
-          //sprintf(msg, "there is no free GreenId (GreenK != 0)", v[31]); plog(msg);
-          WRITES(cur1,"GreenId",v[30]+1);
-        }
-        WRITES(cur1,"alpha",v[32]);
-        WRITELS(cur1,"GreenK",v[5],t);
-        v[9]=VS(cur,"GreenKProd");
-        WRITELS(cur1,"GreenIncProductivity",v[9],t);
-        
-        WRITELS(cur1,"GreenKAge",0,t);
-        v[11]=VS(cur,"KP");
-        WRITELS(cur1,"GreenKPrice",v[11], t);
-        v[12]=v[11]*v[5];
-        WRITELS(cur1,"GreenKExpenditures",v[12], t);
-        
-        
-        v[50]=min(v[0],v[3]);
-        
-         //sprintf(msg, "\n KQ %lf", v[0] ); plog(msg);
-         //sprintf(msg, "\n v3 %lf", v[3] ); plog(msg);
-				
-				
-        WRITES(cur->up,"LocalGreenInvestment",v[50]);
-        //INCRS(cur6,"TotLocalGreenInvestment",v[50]);
-        
-         //sprintf(msg, "\n LocalGreenInvestment %lf", v[50] ); plog(msg);
-
-        
-        //			cur2=SEARCHS(p->up->up,"Energy");
-        //sprintf(msg, "\n GreenId %lf", v[30] ); plog(msg);
-        
-        
-        v[14]=V("GreenCapitalDep");
-        v[15]=V("MaxGreenKAge");
-        
-        //v[13]=((v[32]*v[9]*((1-v[14])-pow(1-v[14],v[15]+1) )/v[14]))/v[11]; // Computes ActualGreenEnergyCost
-        v[13]=v[11]/(v[32]*v[9]*((1-v[14])-pow(1-v[14],v[15]+1) )/v[14]); // Computes ActualGreenEnergyCost
-        
-        
-        //INTERACT("GreenEnergyCost",v[13]);
-//sprintf(msg, "\n GreenEnergyCostKProductionFlow %lf", v[13] ); plog(msg);
-        WRITELS(cur1,"ActualGreenEnergyCost",v[13],t);
-        
-        
-        WRITES(cur->hook,"EWaiting",0); //tell the firms it has the new capital
-        cur5=SEARCHS(cur->hook,"BankE");
-        INCRS(cur5,"BalanceE",-v[4]*v[11]); //sprintf(msg, " KF(%g)\n", v[4]*v[11]); plog(msg);  
-        cur4=SEARCH("BankK");
-        INCRS(cur4,"KRevenues",v[4]*v[11]);
-        
-        cur3=SEARCHS(p->up->up, "Bank");
-        if(cur3==NULL)
-          INTERACT("MERDE CUR3", v[15]);
-        INCRS(cur3,"CapitalDemand",v[4]*v[11]);
-        
-        ////      WRITES(cur1,"ResellPrice",v[11]*V("DiscountUsedK"));
-        
-        v[20]=INCR("NumOrders",-1);
-        //if(v[20]<=0)
-        //INTERACTS(cur, "Ponco", v[20]);
-        if(v[20]>0)
-          DELETE(cur);
-        else
-        {
-          WRITES(cur,"KAmount",0);
-          WRITES(cur,"KCompletion",0);
-          WRITES(cur,"TimeWaited",0);
-          WRITES(cur,"Kproductivity",0);
-          WRITES(cur,"KEfficiency",0); 
-          WRITES(cur, "IdClient", -1);
-          cur->hook=NULL;
-          
-        }
-      }
-      else
-      {// Order is not a GreenOrder
-        
-        if(cur->hook==NULL)
-          INTERACT("hook NULL",v[0]);
-        
-        //INTERACT("stop",v[0]);
-        
-        
-        //        INCRS(cur->hook,"NumK",1); // hook should be the ordering firm
-        //cur1=ADDOBJS(cur->hook,"Capital");
-        //      cur1=cur->hook->add_an_object("Capital");
-        //        if(t>7)
-        //      INTERACTS(cur->hook, "PincoPallo", v[5]);
-        cur1=ADDOBJS(cur->hook,"Capital");
-        WRITELS(cur1,"K",v[5],t);
-        v[9]=VS(cur,"Kproductivity");
-        WRITELS(cur1,"IncProductivity",v[9],t);
-        
-        // Incorporate KEfficiency in the vintage produced IncEfficiency
-        v[90]=VS(cur,"KEfficiency");
-        WRITELS(cur1,"IncEfficiency",v[90],t);
-        
-        //      v[10]=VS(cur,"KSkillBiais");
-        //      WRITELS(cur1,"IncSkillBiais",v[10],t);
-        WRITELS(cur1,"IncLearningK",0.1,t);
-        WRITELS(cur1,"KAge",0,t);
-        v[11]=VS(cur,"KP");
-        v[12]=v[11]*v[5];
-        WRITELS(cur1,"KExpenditures",v[12], t);
-        WRITES(cur->hook,"Waiting",0); //tell the firms it has the new capital
-        SORTS(cur->hook,"Capital","IncProductivity", "DOWN");
-        cur5=SEARCHS(cur->hook,"BankF");
-        INCRS(cur5,"DebtF",v[4]*v[11]); //sprintf(msg, " KF(%g)\n", v[4]*v[11]); plog(msg);  
-        INCRS(cur5->hook,"CapitalDemand",v[4]*v[11]);
-        cur5=SEARCH("BankK");
-        INCRS(cur5,"KRevenues",v[4]*v[11]);
-        
-        //      WRITES(cur1,"ResellPrice",v[11]*V("DiscountUsedK"));
-        
-        v[20]=INCR("NumOrders",-1);
-        if(v[20]>0)
-          DELETE(cur);
-        else
-        {
-          WRITES(cur,"KAmount",0);
-          WRITES(cur,"KCompletion",0);
-          WRITES(cur,"TimeWaited",0);
-          WRITES(cur,"Kproductivity",0);
-          WRITES(cur,"KEfficiency",0);
-          WRITES(cur, "IdClient", -1);
-          cur->hook=NULL;
-          
-        }
-      }
-    }
-  }
-  else
-  {
-    if(v[4]>0)
-      INCRS(cur,"TimeWaited",1); // if orders remain non completed increase the time needed to go through future orders
-  }
-  
-}
-
-v[13]=min(V("KQ"),v[3]);
-v[15]=V("KQ")-v[3];
-v[16]=v[15]-v[0];
-//if(v[15]>0 && v[15]!=v[0])
-//INTERACT("check the correspondence between production and KQ",v[16]);
-//if(v[15]<0 && v[0]!=0)
-//INTERACT("check the correspondence between production and KQ",v[0]);
-
-
-
-
-RESULT(v[13] )
-  
-  
-  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1978,7 +1737,7 @@ else
 		//v[0]=V("GreenEN");
 		v[0]=V("TotEnergyConsumption");
 	}
-	
+
 	v[1]=V("GreenCapacityGrowth");
 	v[4]=v[0]*v[1]+0;
 	//v[3]=VL("GreenInvestment",1);
@@ -1990,57 +1749,6 @@ v[6]=0.9*v[5]+0.1*v[4];
 
 RESULT(v[6] )
 
-
-
-
-
-
-EQUATION("CallMinGreenId") 
-  /*
-   greenId is a proxy for the location quality of green investment
-   */
-v[0]=0;
-//cur1=SEARCHS(root,"Energy");
-//if(cur1==NULL)
-//	INTERACT("cur NULL",v[0]);
-	
-cur1=p;
-v[4]=V("alphaFactor");
-v[5]=V("maxAlpha");
-CYCLE(cur,"GreenCapital")
-{
-  v[0]=VS(cur,"GreenId"); // current Id
-  v[1]=VS(cur,"GreenK");
-  if(v[1]==0) //check if the vintage has been scrapped
-  {
-  	//INTERACT("GreenK==0",v[1]);
-  	//sprintf(msg, "\n found 0 GreenK", v[0] ); plog(msg);
-    WRITE("MinGreenId",v[0]);
-    //INTERACT("check MinGreenId",v[0]);
-    //sprintf(msg, "\n New MinGreenId %g", v[0] ); plog(msg);
-
-    WRITES(cur1,"MinAlpha",v[5]*pow((1-v[4]),v[0]));
-    END_EQUATION(v[0])
-  }
-}
-
-v[2]=MAXS(cur1,"GreenId")+1;  
-//sprintf(msg, "\n MaxGreenId +1 %g", v[2] ); plog(msg);
-WRITES(cur1,"MinGreenId",v[2]);
-WRITES(cur1,"MinAlpha",v[5]*pow((1-v[4]),v[2]));
-//WRITES(cur,"alpha",v[5]-v[4]*v[2]);
-
-
-RESULT(1 )
-
-
-
-
-
-
-
-
-
 EQUATION("FlippingCoin")
 /*
 A random result indicating with 0 if First0 is computed first or, with 1, if First1 must have the precedence
@@ -2048,11 +1756,8 @@ A random result indicating with 0 if First0 is computed first or, with 1, if Fir
 if(RND<0.5)
  v[0]=0;
 else
- v[0]=1; 
+ v[0]=1;
 RESULT(v[0] )
-
-
-
 
 
 EQUATION("InvestmentDecision")
@@ -2061,7 +1766,6 @@ Place an order of K if you need it and did not place an order as yet
 */
 v[5] = V("FlippingCoin");
 //if(v[5]==1)
-// V("GreenInvestmentDecision"); //this line ensures that GreenInvestmentDecision is completed before the code for this variable is completed
 
 v[0]=V("Waiting");
 if(v[0]==1)
@@ -2077,12 +1781,83 @@ v[4]=VL("Liquidity",1);
 
 if(v[1]>0 && RND<v[4]/v[3] )
  {
+  cur = SEARCHS(p->up->up, "Machinery");
+  WRITES(cur, "IsEnergyK", 0);
   V("PlaceOrder");
   WRITE("Waiting",1);
- } 
+ }
 
 RESULT( 1)
 
+EQUATION("InitKENCapacity")
+/*
+Comment
+*/
+v[0] = V("CapitalEN");
+v[1] = V("MultiplierCapacityEN");
+RESULT(v[0]*v[1] )
+
+
+EQUATION("KENCapacity")
+/*
+Comment
+*/
+v[0] = V("InitKENCapacity");
+v[1] = V("PPKAge");
+v[2] = V("CapitalDepressEN");
+
+v[3]=pow(1-v[2],v[1]);
+v[4]=v[0]*v[3];
+RESULT(v[4] )
+
+
+EQUATION("AvUtilization")
+/*
+Comment
+*/
+v[0]=v[1]=v[2]=0;
+CYCLE(cur, "CapitalEF")
+{
+   v[4] = VS(cur, "MAUtilizationPP");
+  	v[0] += v[4];
+  	v[1]++;
+  	v[2] += VS(cur,"InitKENCapacity");
+}
+
+WRITE("TotalCapacityEF", v[2]);
+RESULT(v[0]/v[1] )
+
+EQUATION("InvestmentDecisionEF")
+/*
+Place an order of K if you need it and did not place an order as yet
+*/
+v[0]=V("WaitingEF");
+if(v[0]==1)
+ END_EQUATION(1); //skip the equation if you already placed an order. To be edited to give the possibility to remove a too late order
+//we are here only if there is no pending order
+
+v[1] = V("AvUtilization");
+
+v[4] = V("ThresholdCapacityEF");
+if(v[1]>v[4] )
+ {v[2] = V("TotalCapacityEF");
+  v[5] = V("MultiplierCapacityEN");
+  v[3]= v[2]*(v[1]-v[4])*1.2/v[5];
+  WRITE("KapitalNeedEF", v[3]);
+  cur = SEARCHS(p->up->up, "Machinery");
+  WRITES(cur, "IsEnergyK", 1);
+  V("PlaceOrder");
+  WRITE("WaitingEF",1);
+ }
+
+RESULT( 1)
+
+EQUATION("PPKAge")
+/*
+Comment
+*/
+
+RESULT(CURRENT+1 )
 
 EQUATION("GreenInvestmentDecision")
 /*
@@ -2098,33 +1873,9 @@ v[1]=V("GreenInvestment");
 if(v[1]>0 )
  {
   V("PlaceGreenOrder");
- } 
+ }
 
 RESULT( 1)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 //DEBUG_AT(0);
 /******************************************
@@ -2180,7 +1931,7 @@ cur1=ADDOBJ("Firm");
 //INTERACT("New Firm added",v[1]);
 cur1->hook=c;
 WRITELS(cur1,"Age",0, t);
-WRITELS(cur1,"Visibility",0.1, t);
+WRITELS(cur1,"Visibility",V("minVisibility"), t);
 WRITES(cur1,"IdFirm",v[20]=V("CounterIdFirm"));
 //INTERACT("Entry IdFirm",v[20]);
 cur5=ADDOBJS(c,"sFirm");
@@ -2216,12 +1967,12 @@ CYCLES(cur1, cur2, "Labor")
   v[6]=v[5]*v[4];
   WRITELS(cur2,"wage",v[6],t);
   v[4]=v[6];
-  
-  
+
+
   WRITELS(cur2,"NumWorkers",10,t);
   WRITELS(cur2,"NumWorkersGr",0,t);
-	
-  
+
+
  }
 
 cur2=SEARCHS(cur1,"BankF");
@@ -2247,7 +1998,7 @@ cur4=SEARCHS(cur1,"Capital");
 WRITES(cur4,"IncProductivity",v[10]);
 
 WRITELS(cur1,"MonetarySales",1, t);
-WRITELS(cur1,"Q",0, t);
+WRITELS(cur1,"Q",10, t);
 WRITELS(cur1,"backlog",0, t);
 WRITELS(cur1,"ExpectedSales",10, t);
 WRITELS(cur1,"CapitalStock",10, t);
@@ -2266,7 +2017,7 @@ WRITELS(cur1,"Vacancies",0, t);
 WRITELS(cur1,"MonetarySalesL",1, t);
 WRITELS(cur1,"Health",1, t);
 WRITELS(cur1,"smoothMonSales",1, t);
-WRITELS(cur1,"Visibility",0.1, t);
+WRITELS(cur1,"Visibility",V("minVisibility"), t);
 WRITELS(cur1,"SmoothProfit",1, t);
 WRITELS(cur1,"RatioVacancies",0, t);
 
@@ -2278,9 +2029,9 @@ WRITELS(cur4,"KAge",0,t);
 WRITELS(cur4,"MaxKQ",0,t);
 
 v[50]=V("AvMaxEfficiency");
-
 //INTERACT("AvEff",v[50]);
 WRITELS(cur4,"IncEfficiency",v[50],t);
+
 
 //cur5=SEARCHS(cur1,"blItem");
 //WRITES(cur5,"blPrice",0.5*V("AvPrice"));
@@ -2291,11 +2042,12 @@ v[44]=0;
 CYCLE_SAFES(cur1, cur, "blItem")
 {
 	if(v[44]==1)
-	 DELETE(cur);
+	DELETE(cur);
 	else
-	 WRITES(cur, "blQ", 0); 
+	WRITES(cur, "blQ", 0);
 	v[44]=1;
 }
+
 
 
 
@@ -2310,7 +2062,7 @@ RESULT( 1)
 EQUATION("ClearExitRecord")
 /*
 Prepare the computation of the exit record
-*/	
+*/
 
 CYCLE(cur, "Sectors")
  {
@@ -2368,18 +2120,18 @@ CYCLE_SAFE(cur, "Firm")
 //      cur3 = SEARCH_CND("IdClient", v[33]);
 //      if(cur3!=NULL)
 //       INTERACTS(cur3, "Merd3", v[33]);
-      
+
       INCRS(cur->hook->up,"NFirmsS",-1);
       v[5]=VS(cur,"Age");
       if(V("ExitFlag")==1 )
         INTERACTS(cur,"Dying", v[7]);
       INCRS(cur->hook->up,"AvAgeDeath",v[5]);
-      INCRS(cur->hook->up,"numExit",1);      
+      INCRS(cur->hook->up,"numExit",1);
       INCRS(cur2->hook,"CapitalDestroyed",v[20]);
-      DELETE(cur->hook); 
+      DELETE(cur->hook);
       DELETE(cur);
       v[4]++;
-      
+
      }
    }
  }
@@ -2403,8 +2155,7 @@ if(v[3]>0)
  MULT("AvAgeDeath",1/v[3]);
 
 v[4]=V("probEntry");
-v[5] =min(0.2, max(V("UnemploymentRate"),0.01));
-if(RND<v[4]*v[5])
+if(RND<v[4])
  { //v[1]=VS_CHEAT(cur,"Entry",p);
 	 v[1]=V_CHEATS(cur,"Entry",p);
    INCR("NFirmsS",v[1]);
@@ -2440,7 +2191,7 @@ if(v[0]==1)
 else
  {
   v[1]=CURRENT;
- } 
+ }
 RESULT(v[1] )
 
 
@@ -2480,7 +2231,7 @@ if(v[2]<1)
 
 v[3]=(v[2]-v[0])/v[2];
 
-v[4]=max(v[3],0.001);
+v[4]=max(v[3],V("minVisibility"));
 
 v[5]=v[1]*0.9+0.1*v[4];
 //v[5]=CURRENT*0.9+0.1;
@@ -2515,25 +2266,26 @@ if(c->hook==NULL)
  {
   cur9=SEARCH_CND("IdGood",v[30]);
   c->hook=cur9;
- } 
+ }
 else
  cur9=c->hook;
+
 CYCLES(c, cur, "DCh")
   WRITES(cur,"temp",-1);//set to -1 the max value
 
 v[72]=1;
 while(v[0]==0)
 {//repeat for increasing levels of visibility as long no firms have been found
-//   CYCLE(cur, "Firm") 
+//   CYCLE(cur, "Firm")
  v[50]=0;
  CYCLES(cur9,cur8, "sFirm")
-   v[50]+=VLS(cur8->hook,"Visibility",1);  
+   v[50]+=VLS(cur8->hook,"Visibility",1);
  CYCLES(cur9,cur8, "sFirm")
    {
-    v[51]=VLS(cur8->hook,"Visibility",1);  
+    v[51]=VLS(cur8->hook,"Visibility",1);
     WRITES(cur8,"app1",v[51]/v[50]);
-   } 
-    
+   }
+
   CYCLES(cur9,cur8, "sFirm")
   {
    cur=cur8->hook;
@@ -2546,7 +2298,7 @@ while(v[0]==0)
     }
    else
     { // if the firm produces the required good
-     WRITES(cur,"app",1);   
+     WRITES(cur,"app",1);
      v[0]++;
      CYCLES(cur, cur1, "Ch")
       {//for any characteristic
@@ -2557,17 +2309,17 @@ while(v[0]==0)
        v[71]=norm(v[22],v[4]*v[22]); //this is the observed value
        //v[71]=norm(v[22],v[4]); //ABSOLUTE VARIANCE
        v[23]=max(0,v[71]);
-       WRITES(cur1,"obs_x",v[23]); //write the observed value 
+       WRITES(cur1,"obs_x",v[23]); //write the observed value
       }
     }
-  }	
+  }
  if(v[0]==0)
   {//if no firm managed to get visible push up visibility and try again.
    v[72]++;
-  } 
+  }
   if(v[72]>100)
    INTERACTS(c, "No visible firms", v[72]);
-}  
+}
 
 //Do a proper choice among the (more than one) viable options
 
@@ -2596,8 +2348,8 @@ CYCLES(c, cur, "DCh")
         v[6]=v[8];
        }
      }
-   }    
-  
+   }
+
   v[74]=100000000;
   //CYCLE(cur1, "Firm")
   CYCLES(cur9,cur8, "sFirm")
@@ -2611,9 +2363,9 @@ CYCLES(c, cur, "DCh")
      if(v[25]==-1)
       v[33]=1/v[3];
      else
-      v[33]=v[3]; 
+      v[33]=v[3];
      v[78]=v[8]*v[25];
-     v[79]=v[6]*v[33]*v[25]; 
+     v[79]=v[6]*v[33]*v[25];
      v[77]=v[79]-v[78];
      if(v[8]*v[25]<v[6]*v[33]*v[25]-0.00001)//approximations sometime makes things weird
       {//too low value: remove
@@ -2625,7 +2377,7 @@ CYCLES(c, cur, "DCh")
       //sprintf(msg, " in need %g of class %g\n", v[30],VS(c,"NumClass"));
       //plog(msg);
       }
-      
+
     }
    }
 //INTERACT("Subsequ", v[0]);
@@ -2639,7 +2391,7 @@ if(v[80]!=v[0])
   //plog(msg);
  }
 //CYCLE(cur, "Firm")
-CYCLES(cur9,cur8, "sFirm") 
+CYCLES(cur9,cur8, "sFirm")
  {
   v[32]=VS(cur8->hook,"app");
   if(v[32]==1)
@@ -2665,18 +2417,18 @@ CYCLE(cur, "Supply")
     v[5]+=VS(cur1,"Age");
     v[6]++;
     VS(cur1,"WagePrem");
-    
+
     v[8]=0;
     CYCLE_SAFES(cur1, cur2, "Labor")
      {
       v[4]=VS(cur2,"NumWorkers");
-      v[8]+=v[4];  
+      v[8]+=v[4];
       //INCRS(cur2->hook,"tempWage",v[2]*v[4]);
       if(v[4]==0 && VS(cur2,"IdLabor")!=1)
        DELETE(cur2);
-               
+
      }
-   v[9]+=v[8];  
+   v[9]+=v[8];
    cur5=SEARCHS(cur1,"BankF");
    VS(cur1,"NetWorth");
    }
@@ -2691,15 +2443,22 @@ CYCLE(cur, "KFirm")
     if(v[4]==0 && VS(cur2,"IdKLabor")!=1)
       DELETE(cur2);
    }
-  v[70]+=VS(cur,"DebtK"); 
+  v[70]+=VS(cur,"DebtK");
  }
-/* 
+
+cur = SEARCH("Energy");
+CYCLES(cur, cur1, "EnergyFirm")
+{
+	VS(cur1, "WagePremEF");
+}
+
+/*
  v[5]=V("TotPremia");
  v[6]=V("TotWage");
  if(v[5]!=v[0] || v[6]!=v[1])
   {
    INTERACT("Failed income",v[1]);
-  } 
+  }
 */
 WRITE("AvAge",v[5]/v[6]);
 
@@ -2720,13 +2479,13 @@ CYCLE(cur, "Class")
    {
     if(cur1->hook==NULL)
      {
-      v[10]=VS(cur1,"IdNeed");     
+      v[10]=VS(cur1,"IdNeed");
       cur1->hook=SEARCH_CND("IdGood",v[10]);
 
      }
    v[12]=VS(cur1->hook,"BLrecouped");
    v[2]+=v[12]*v[11];
-     
+
    }
   WRITES(cur,"Recouped",v[2]);
  }
@@ -2737,7 +2496,7 @@ EQUATION("Trade")
 /*
 Set a trading cycle:
 - initialize "sales" to zero in firms;
-- compute the sales for each firm as the total of classes and needs 
+- compute the sales for each firm as the total of classes and needs
 */
 
 CYCLE(cur1, "Supply")
@@ -2750,25 +2509,25 @@ CYCLE(cur1, "Supply")
   }
  }
 
-v[70]=v[71]=0;
 CYCLE(cur, "Class")
  {
   v[4]=VS(cur,"Expenditure");
-  v[70]+=v[4];
+	 v[70]+=v[4];
   WRITES(cur,"NoConsumption",0); // after having computed the expenditure set the non expenditure to 0, to be computed again inthis period for the following period expenditures
   v[14]=v[21]=0;
   v[18] = VS(cur, "Competitiveness");
+  
   CYCLES(cur, cur1, "Need")
    { // Cycle through the needs of the class
     if(cur1->hook==NULL)
       {//this hook should point to the sector of the need, find it if not already set
        v[10]=VS(cur1,"IdNeed");
-       cur1->hook = SEARCH_CND("IdGood", v[10]); 
-      } 
+       cur1->hook = SEARCH_CND("IdGood", v[10]);
+      }
     if(VS(cur1->hook, "NFirmsS")<1)
      INTERACTS(cur1, "Number of SFirm=0",v[14]);
     v[12]=VS(cur1, "Share");
-    v[13]=v[12]*v[4];
+    v[13]=v[12]*v[4];//share of expenditure on this need
     v[30]=-1;
     CYCLES(cur1->hook, cur2, "sFirm")
      {//Find the maximum price
@@ -2776,10 +2535,10 @@ CYCLE(cur, "Class")
       v[31] = VS(cur3, "x");
       if(v[31]>v[30])
         v[30]=v[31];
-       
-     }    
-    v[30]*=1.1;//increase the maximum price of 10% to avoid the indicator to be 0 
-    v[17]=0;     
+
+     }
+    v[30]*=1.1;//increase the maximum price of 10% to avoid the indicator to be 0
+    v[17]=0;
     CYCLES(cur1->hook, cur2, "sFirm")
      {//Cycle through all firms producing the good for this need
       cur4 = SEARCHS(cur2->hook, "Ch");
@@ -2791,30 +2550,30 @@ CYCLE(cur, "Class")
         	if(VS(cur4, "IdCh")==1)
           	v[15]*=pow(v[30]-v[14],v[16]);//Factor for price
          else
-          	v[15]*=pow(v[14],v[16]);//Factor for quality    
-         if(is_nan(v[15])==true)
-       INTERACTS(cur4,"NAN15", v[15]);  	       	
+          	v[15]*=pow(v[14],v[16]);//Factor for quality
         	cur4=cur4->next;
         }
-        v[19]=pow(v[15],v[18]);
-      if(is_nan(v[19])==true)
-       INTERACTS(cur2,"NAN", v[15]);  
-      WRITES(cur2, "app2", v[19]);
+        v[22] = VLS(cur2->hook, "Visibility",1);
+        v[19]=pow(v[15],v[18])*v[22];
+      WRITES(cur2, "app2", v[19]);//write the indicator for this sFirm
       v[17]+=v[19];
-     } 
+     }
+    v[71]=v[40]=v[42]=v[43]=0; 
+    
     CYCLES(cur1->hook, cur2, "sFirm")
      {//Cycle again through the firms supplying this good
       v[20] = VS(cur2, "app2");
+      v[43]+=v[20]/v[17];
       v[21]= v[13]*v[20]/v[17];//Share of the expenditures allocated to the firm
       INCRS(cur2->hook, "MonetarySales", v[21]);
       WRITES(cur2, "app3", v[20]/v[17]);
       v[71]+=v[21];
      }
    }
-  } 
+  }
 
-if(abs(v[70]-v[71])>0.001)
- LOG("\nExpenditures %lf\nMonetary sal %lf (%lf)\n",v[70],v[71], abs(v[70]-v[71]));
+//if(abs(v[70]-v[71])>0.001)
+// LOG("\nExpenditures %lf\nMonetary sal %lf (%lf)\n",v[70],v[71], abs(v[70]-v[71]));
 
 RESULT( 1)
 
@@ -2824,7 +2583,7 @@ EQUATION("TradeXXX")
 /*
 Set a trading cycle:
 - initialize "sales" to zero in firms;
-- compute the sales for each firm as the total of classes and needs 
+- compute the sales for each firm as the total of classes and needs
 */
 
 CYCLE(cur1, "Supply")
@@ -2857,7 +2616,7 @@ CYCLE(cur, "Class")
          {//you just need to know if there is 1 firm, don't waste time
           v[12]++;
           break;
-         } 
+         }
        }
 
      }
@@ -2889,40 +2648,33 @@ CYCLE(cur, "Class")
     v[19]=VS(cur1,"ProdExists");
     if(v[19]==1)
      {
-      v[0]=0;   
+      v[0]=0;
       //v[5]=VS(cur1,"Share");
-      //v[6]=v[5]*v[4];  
+      //v[6]=v[5]*v[4];
       v[9]=VS(cur1,"NumIterations");
       v[18]=VS(cur1,"TempIterations");
-   
+
       for(v[8]=0; v[8]<v[9]+v[18]; v[8]++)
         V_CHEAT("TTB_multiplWinner", cur1);
-        
+
      }
    }
  }
 
 CYCLE(cur, "Sectors")
  {
- VS(cur,"RedistributeSales");   
+ VS(cur,"RedistributeSales");
  }
 
-v[71]=0;
-CYCLE(cur, "Firm")
-{
-	v[71] += VS(cur, "MonetarySales");
-}
-
-if(abs(v[70]-v[71])>0.001)
- LOG("\nExpenditures %lf\nMonetary sal %lf (%lf)\n",v[70],v[71], abs(v[70]-v[71]));
 
 cur=SEARCH("Bank");
 RESULT( 1)
+
 EQUATION("RedistributeSales")
 /*
 This routine redistributes sales in order to avoid excessive backlogs. The logic is that customers choosing firms that cannot deliver will redirect their expenses to firms with available capacity.
 
-The routine collects total capacity in excess of demand and demand in excess of capacity. The latter is redistributed in proportion to the former. 
+The routine collects total capacity in excess of demand and demand in excess of capacity. The latter is redistributed in proportion to the former.
 
 In case total capacity of the industry is not sufficient to meet the demand, the residual is distributed in proportion to sales
 */
@@ -2954,7 +2706,7 @@ CYCLE(cur, "sFirm")
     v[3]++;
     //WRITES(cur,"app3",1);
     //WRITES(cur,"app4",v[7]*v[5]);
-   } 
+   }
  }
 if(v[3]==0)
  END_EQUATION(-1);
@@ -2977,14 +2729,14 @@ CYCLE(cur, "sFirm")
    {//undersold
     v[14]=v[7]*v[5]-v[4];
     if(v[2]>0)
-      v[11]=v[4]+v[13]*v[14]/v[2];     
+      v[11]=v[4]+v[13]*v[14]/v[2];
     else
       v[11]=v[4]+v[13]*VLS(cur->hook,"Q",1)/v[21];
     //WRITES(cur,"app1",v[11]);
     v[12]=v[9]*v[4]/v[8];
-    //WRITES(cur,"app2",v[12]);    
-   } 
-  v[10]+=v[11]+v[12]; 
+    //WRITES(cur,"app2",v[12]);
+   }
+  v[10]+=v[11]+v[12];
   v[32]+=v[12];
   WRITES(cur->hook,"MonetarySales",v[11]+v[12]);
  }
@@ -3044,7 +2796,7 @@ v[3]=VL("Stocks",1);
 v[7]=min(v[1], v[0]+max(0,v[3]-v[2]) );
 if(v[7]<0)
  INTERACT("NegSales", v[7]);
- 
+
 RESULT(v[7] )
 
 
@@ -3076,7 +2828,7 @@ if(v[0]>v[1]+v[3] && v[2]>0)
  {//fill some orders reducing the backlog
  // if(v[3]>0)
    //INTERACT("Positive stocks with backlog",v[3]);
-  v[7]=v[0]-v[1]; //excess production available to fill backlog orders 
+  v[7]=v[0]-v[1]; //excess production available to fill backlog orders
   v[5]=v[6]=0;
   v[9]=V("numBLI");
   if(v[9]>0)
@@ -3099,35 +2851,35 @@ if(v[0]>v[1]+v[3] && v[2]>0)
         {
          WRITES(cur,"blQ",0);
          v[77]=1;
-         } 
+         }
        }
-      else 
+      else
        {v[23]++;
         v[11]=v[4]-v[7];//units remaining in the BL
         v[5]+=v[7]; //units sold
         v[6]+=v[7]*v[8];
         INCRS(cur,"blQ",-v[7]);
         v[7]=0;
-       }    
+       }
      }
-    } 
- /****/   
-  v[78]=v[79]=0; 
+    }
+ /****
+  v[78]=v[79]=0;
   CYCLE(cur, "blItem")
     {v[78]++;
      if(VS(cur,"blQ")==0)
       {
        v[79]++;
-      } 
-    } 
+      }
+    }
   if(v[78]-v[79]!=V("numBLI") )
    INTERACT("WRONG numBLI",v[78]);
- /***********/     
+ ***********/
   v[2]-=v[5];
   WRITE("backlogSales",v[6]);
   v[21]=1;
  }
- 
+
 if(v[0]+v[3]<v[1])
  {//generate a new backlog item
   v[13]=INCR("numBLI",1);
@@ -3138,12 +2890,12 @@ if(v[0]+v[3]<v[1])
   WRITES(cur1,"blQ",v[1]-v[0]-v[3]);
   WRITES(cur1,"blPrice",VL("price",1));
   v[2]+=v[1]-v[0]-v[3];
-  v[21]=2; 
+  v[21]=2;
  }
- 
-//if(v[2]<-0.001) 
+
+//if(v[2]<-0.001)
  //INTERACT("Neg.bl",v[7]);
- 
+
 v[22]=0;
 /*
 CYCLE(cur, "blItem")
@@ -3152,7 +2904,7 @@ CYCLE(cur, "blItem")
  }
 if(abs(v[22]-v[2])>0.001)
   INTERACT("DiffSum",v[22]);
-v[2]=v[22];  
+v[2]=v[22];
 */
 if(v[77]==1)
  {//killed last backlog, any non-zero value is due to approximation
@@ -3248,10 +3000,11 @@ EQUATION("Q")
 Actual production, which is the minimum between desired production and constraints
 */
 
+v[6] = V("ExtraCapacity");
 v[0]=V("DesiredQ");
-v[1]=V("LaborCapacity");
+v[1]=V("LaborCapacity")*v[6];
 v[2]=min(v[0],v[1]);
-v[3]=V("CapitalCapacity");
+v[3]=V("CapitalCapacity")*v[6];
 v[5]=min(v[3],v[2]);
 
 RESULT(v[5] )
@@ -3307,7 +3060,8 @@ if(v[14]==1)
   //v[10]=V("backlog");
   //v[11]=v[1]+v[10];
   v[2]=V("MaxLaborProductivity");
-  v[8]=V("CapitalCapacity");
+  v[30] = V("ExtraCapacity");
+  v[8]=V("CapitalCapacity")*v[30];
   v[9]=min(v[1],v[8]);
   v[4]=V("DesiredUnusedCapacity");
   v[3]=v[4]*(v[9]/v[2]);
@@ -3320,7 +3074,7 @@ if(v[14]==1)
      v[28]*=v[26];
      v[6]=v[0]+v[28];
    }
-  
+
 /*
     if(v[6]/v[0]-1 > 1+V("NumWorkersMaxGr") )
   	{
@@ -3329,11 +3083,11 @@ if(v[14]==1)
   		v[6]=1+V("NumWorkersMaxGr");
   		}
   	}
-*/  
-  
+*/
+
   v[33]=(v[3]>v[6])?(v[3]-v[6]):0; //number of vacancies for the first layer, if there are more desired workers than actual new hires
   WRITES(p->up,"Vacancies",v[33]);
-  v[54]=v[33]/(v[6]);//ratio of vacancies to actual workers
+  v[54]=v[33]/v[6];//ratio of vacancies to actual workers
   WRITES(p->up,"RatioVacancies",v[54]);
  }
 
@@ -3368,7 +3122,7 @@ else
         cur7=cur7->hook;
        }
       v[22]++;
-      
+
      }
     if(v[22]-1<v[18]+1)
      { //starting from the second class (the first are engineers), if it does not exist a class that represnt the new layer of executives, create it
@@ -3385,12 +3139,12 @@ else
       v[46]=v[44]*(1-v[45])+v[45];
       WRITES(cur3,"SavingRate",v[46]);
 //      INTERACTS(cur3,"Inspect SavingRate", v[46]);
-      
+
       WRITES(cur3,"NumClass",v[18]+1);
       WRITELS(cur3,"Expenditure",0, t-1);
       WRITELLS(cur3,"Expenditure",0, t-1,1);
       WRITELS(cur3,"Income",0, t-1);
-      WRITELS(cur3,"Consumption",0, t-1);      
+      WRITELS(cur3,"Consumption",0, t-1);
       WRITELS(cur3,"ShareWageIncome",0, t-1);
       WRITELS(cur3,"SharePremiaIncome",0, t-1);
       //WRITELS(cur3,"ShareProfitIncome",0, t-1);
@@ -3398,7 +3152,7 @@ else
       // WRITELS(cur3,"NumIterations",0, t-1); to reactivate when NumIterations report the number of consumers in the labour class, as given in equation "ShareWageIncome". Otherwise the number of iterations simply define the number of representative conusmers (groups) in a class
       WRITELS(cur3,"ShareIncome",0, t-1); // reset the share income to be recomputed
       WRITES(cur3,"Individuals",v[20]); // set the number of individuals to nu;ber of workers of the new class
-      v[35]=VS(cur2,"LorenzInd"); 
+      v[35]=VS(cur2,"LorenzInd");
       WRITES(cur3,"LorenzInd",v[35]+v[20]); // set total number of workers as previous total plus new workers
       WRITELS(cur3,"NoConsumption",0, t-1); // set the savongs due to unavailability of the good to 0
       //INTERACTS(cur3,"Created class",v[44]);
@@ -3414,7 +3168,7 @@ else
             if(v[28]==v[27])
              { // when in the same need as the one the new class is cycling cycle through the char of the preceding class
               CYCLES(cur4, cur5, "DCh")
-               { 
+               {
                 v[29]=VS(cur5,"IdDCh");
                 if(v[29]==v[26])// when in the same characteristic the new class is cycling
                  v[30]=VS(cur5,"tau"); // read the value of the tau parameter
@@ -3435,14 +3189,14 @@ else
 
        }
      v[35]=VS(cur3,"ComputeShare"); // set the distribution of expenditure shares across needs for the new class
-     
+
      }
     else
      {
       cur3=SEARCH_CND("NumClass",v[18]+1);
       cur1->hook=cur3;
-     
-     } 
+
+     }
 
    }
   if(v[18]>2 && v[19]<v[21])
@@ -3455,7 +3209,7 @@ RESULT(v[6] )
 
 EQUATION("MinimumPriceSet")
 /*
-System equation that mantains the `minimum' parameter for the price characteristic, of the first tyer working class and engineers, above the minimum price among firms (times the variance of the consumer percetion error). 
+System equation that mantains the `minimum' parameter for the price characteristic, of the first tyer working class and engineers, above the minimum price among firms (times the variance of the consumer percetion error).
 It also sets the Minimum parameter across needs for the price
 */
 
@@ -3586,7 +3340,7 @@ CYCLE(cur, "Class")
   if(v[6]>0)
    v[0]+=v[6];
   else
-   v[1]-=v[6]; 
+   v[1]-=v[6];
  }
 
 
@@ -3606,8 +3360,8 @@ CYCLE(cur, "Firm")
     v[3]-=v[6];
     INCRS(cur1,"DebtF",-v[6]);
    }
-  v[7]+=VS(cur1,"DebtF");  
-  
+  v[7]+=VS(cur1,"DebtF");
+
  }
 
 CYCLE(cur, "KFirm")
@@ -3621,12 +3375,24 @@ CYCLE(cur, "KFirm")
     v[3]-=v[6];
     INCRS(cur1,"DebtK",-v[6]);
    }
-  v[7]+=VS(cur1,"DebtK");   
+  v[7]+=VS(cur1,"DebtK");
  }
+
+cur = SEARCH("Energy");
+
+CYCLES(cur, cur1, "EnergyFirm")
+{
+	v[2] += VS(cur1, "CapitalCostEF");
+	v[17] = VS(cur1, "BalanceEF");
+	if(v[17]<0)
+	 v[7]+=-v[17];
+}
 
 WRITES(cur2,"TotalCapital",v[7]);
 WRITES(cur2,"TotalDividends",v[2]);
-WRITES(cur2,"TotalLosses",v[3]); 
+WRITES(cur2,"TotalLosses",v[3]);
+
+
 RESULT(1)
 
 EQUATION("UnitValue")
@@ -3652,7 +3418,7 @@ RESULT(v[0]+v[1] )
 
 EQUATION("NewUnits")
 /*
-The number of new units is the new investment divided by the unit value 
+The number of new units is the new investment divided by the unit value
 */
 
 v[0]=V("TotalSavings");
@@ -3689,7 +3455,7 @@ RESULT(v[0]+v[2]-v[1])
 
 EQUATION("CapitalUsed")
 /*
-Total capital currently employed by firms 
+Total capital currently employed by firms
 */
 
 v[0]=VL("CapitalUsed",1);
@@ -3723,7 +3489,8 @@ EQUATION("OilIncomeReturned")
 Income from oil used to payback debt
 */
 v[0] = V("OilIncome");
-v[1] = VL("BalanceE", 1);
+//v[1] = VL("BalanceE", 1);
+v[1]=0;
 v[2]=max(0,min(v[0],-v[1]));
 RESULT(v[2] )
 
@@ -3734,7 +3501,6 @@ Income available to be spent for consumption
 v[0] = V("OilIncome");
 v[1] = V("OilIncomeReturned");
 RESULT(v[0]-v[1] )
-
 
 
 EQUATION("Income")
@@ -3750,8 +3516,8 @@ v[14]=V("DividendsC");
 v[12]=V("NoConsumption");
 v[20]=V("LiquidityRentsC");
 
-v[34]=V("OilNetIncome")*v[3];
-
+//v[34]=V("OilNetIncome")*v[3];
+v[34]=0;
 
 v[5]=v[0]+v[1]+v[3]*v[4]+v[14]+v[12] +v[34];
 RESULT(v[5])
@@ -3764,7 +3530,7 @@ V("Production");
 v[0]=V("Income");
 v[3]=VL("ShareIncome",1);
 
-v[34]=V("OilIncome"); 
+v[34]=V("OilIncome");
 
 RESULT(v[34]/v[0])
 
@@ -3806,7 +3572,7 @@ v[2]=VL("NumberUnits",1);
 if(v[0]>0)
   v[3]=v[4]*v[1]*v[2]/v[0];
 else
-  v[3]=0;  
+  v[3]=0;
 RESULT(v[3])
 
 EQUATION("DividendsC")
@@ -3821,12 +3587,12 @@ v[2]=VL("NumberUnits",1);
 if(v[0]>0)
   v[3]=v[1]*v[2]/v[0];
 else
-  v[3]=0;  
+  v[3]=0;
 RESULT(v[3])
 
 EQUATION("NumberUnits")
 /*
-Number of units of count defining the shares of dividends the class is entitled to 
+Number of units of count defining the shares of dividends the class is entitled to
 */
 
 v[1]=VS(p->hook,"UnitValue");
@@ -3864,7 +3630,7 @@ v[1]=V("Individuals");
 if(v[1]>0.001)
  v[2]=v[0]/v[1];
 else
- v[2]=0; 
+ v[2]=0;
 RESULT(v[2] )
 
 EQUATION("TotIncomeCapita")
@@ -3892,7 +3658,7 @@ v[1]=V("TotIndividuals");
 if(v[1]>0.001)
  v[2]=v[0]/v[1];
 else
- v[2]=0; 
+ v[2]=0;
 RESULT(v[2] )
 
 
@@ -3939,6 +3705,7 @@ Total income from the wage
 
 v[1]=V("TotWage");
 v[2]=V("TotPremia");
+
 v[3]=0;
 CYCLE(cur, "Class")
 {
@@ -4047,7 +3814,7 @@ v[1]=VS(p->up,"TotPremia");
 if(v[1]==0)
  v[2]=0;
 else
- v[2]=v[0]/v[1]; 
+ v[2]=v[0]/v[1];
 RESULT(v[2] )
 
 EQUATION("DecilesRatios")
@@ -4065,7 +3832,7 @@ CYCLE(cur, "Class")
  {
   v[4]=VS(cur,"ShareIndividuals");
   v[7]=VS(cur,"IncomeCapita");
-  
+
   v[8]=0.01;
   if(v[0]<v[8])
    {//for the 1%
@@ -4082,7 +3849,7 @@ CYCLE(cur, "Class")
     v[2]+=v[7]*v[6];
     v[22]+=v[6];
    }
-  v[0]+=v[4]; 
+  v[0]+=v[4];
  }
 WRITE("IncomeTop1",v[41]=v[1]*100);
 WRITE("IncomeTop10",v[42]=v[2]*10);
@@ -4093,7 +3860,7 @@ CYCLE(cur, "Class")
  {
   v[4]=VS(cur,"ShareIndividuals");
   v[7]=VS(cur,"IncomeCapita");
-  
+
   v[8]=0.90;
   if(v[0]<v[8])
    {//for the 90%
@@ -4105,7 +3872,7 @@ CYCLE(cur, "Class")
   v[0]+=v[4];
  }
 WRITE("IncomeBottom90",v[43]=v[3]/(0.9));
- 
+
 WRITE("Ratio1-90",v[41]/v[43]);
 WRITE("Ratio10-90",v[42]/v[43]);
 SORT("Class","NumClass", "UP");
@@ -4140,7 +3907,7 @@ CYCLE(cur, "Labor")
    {
     v[5]=v[17];
     v[4]=1;
-   } 
+   }
   v[21]+=v[16]*v[17];
   v[22]+=v[17]; // total labour force
   v[26]+=v[25]; //total lagged labour force
@@ -4149,7 +3916,7 @@ CYCLE(cur, "Labor")
 if(v[22]>0)
  v[23]=v[21]/v[22];
 else
- v[23]=0; 
+ v[23]=0;
 WRITE("AvWage",v[21]/v[22]);
 WRITE("LaborForce",v[22]);
 WRITE("LaborForceL",v[26]);
@@ -4165,7 +3932,7 @@ v[2]=V("MaxLaborProductivity");
 if(v[5]>0)
  v[24]=v[21]/(v[2]*v[5]);
 else
- v[24]=v[21]; 
+ v[24]=v[21];
 RESULT(v[24] )
 
 
@@ -4214,7 +3981,7 @@ RESULT(v[4] )
 EQUATION("ExpectedProfit")
 /*
 Level of profits perceived by the firm, which reflects the expected gains from the sales.
-To be used as an indicator of profit that is not oscillating as unit sales, and that would allow to use profits to trigger exit from markets 
+To be used as an indicator of profit that is not oscillating as unit sales, and that would allow to use profits to trigger exit from markets
 */
 
 v[0]=V("ExpectedSales");
@@ -4287,7 +4054,7 @@ v[4]=V("KAge");
 v[9]=V("CapitalIntens");
 v[6]=pow((1-v[2]),v[4]);//computes the depressiation of capital
 v[19]=V("IncLearningK");
-v[7]=v[3]*v[6]*v[19];//computes the actual stock of this capital vintage that can be used 
+v[7]=v[3]*v[6]*v[19];//computes the actual stock of this capital vintage that can be used
 
 v[8]=v[7]/v[9];
 
@@ -4315,21 +4082,24 @@ CYCLE_SAFE(cur, "Capital")
   v[4]=VS(cur,"KAge");
   v[5]=VS(cur, "IncProductivity");
   v[6]=pow((1-v[2]),v[4]);//computes the depreciation of capital
-  v[7]=v[3]*v[6];//computes the actual stock of this capital vintage that can be used 
-  
+  v[7]=v[3]*v[6];//computes the actual stock of this capital vintage that can be used
+
 //  if(v[7]/v[10]>0.01)
 //   {
     v[0]+=(v[7]*v[5]);
     v[1]+=v[7];
 //   }
 //  else
-//   DELETE(cur); 
+//   DELETE(cur);
 
- v[25]=VS(cur, "IncEfficiency");
- v[20]+=(v[7]*v[25]);
+  v[25]=VS(cur, "IncEfficiency");
+	v[20]+=(v[7]*v[25]);
+
+
+
 }
-
 v[8]=v[0]/v[1];//Max Labor productivity computed as the weighted average of the incorporated productivity in every capital vintages
+
 v[28]=v[20]/v[1];
 WRITE("MaxEfficiency", v[28]);
 
@@ -4402,7 +4172,7 @@ RESULT((v[0]*v[1]) )
 
 EQUATION("WagePrem")
 /*
-Wage premia distributed, when available to all classes of executives. 
+Wage premia distributed, when available to all classes of executives.
 */
 
 v[0]=V("Profit");
@@ -4422,7 +4192,7 @@ if(v[5]>0)
       v[3]+=v[2];
      }
    }
-   
+
   CYCLE(cur, "Labor")
    {
     v[10]=VS(cur,"IdLabor");
@@ -4463,7 +4233,7 @@ v[4]=VL("KNbrEngineers",1);
 WRITE("KLaborForce",v[1]+v[3]);
 WRITE("KLaborForceL",v[2]+v[4]);
 WRITE("KLaborGrowth",(v[1]+v[3])/(v[2]+v[4])-1);
-v[0]+=V("KNbrEngineers")*V("KWageEngineers");  
+v[0]+=V("KNbrEngineers")*V("KWageEngineers");
 RESULT(v[0] )
 
 EQUATION("BalanceK")
@@ -4478,29 +4248,29 @@ v[10]=V("LaborCostK");
 
 
 v[5]=v[0]-v[10]-v[1]; //total liquidity after labor costs and premia
- 
+
 RESULT(v[5] )
 
-EQUATION("KLaborCost") 
-/* 
-Comment 
-*/ 
-v[0]=0; 
-CYCLE(cur, "KLabor") 
- { 
-  v[1]=VS(cur,"KNbrWorkers"); 
-  v[2]=VS(cur,"KWage"); 
-  v[0]+=v[1]*v[2]; 
- } 
+EQUATION("KLaborCost")
+/*
+Comment
+*/
+v[0]=0;
+CYCLE(cur, "KLabor")
+ {
+  v[1]=VS(cur,"KNbrWorkers");
+  v[2]=VS(cur,"KWage");
+  v[0]+=v[1]*v[2];
+ }
 
-CYCLE(cur, "KEngineers") 
- { 
-  v[1]=VS(cur,"KNbrEngineers"); 
-  v[2]=VS(cur,"KWageEngineers"); 
-  v[0]+=v[1]*v[2]; 
- } 
+CYCLE(cur, "KEngineers")
+ {
+  v[1]=VS(cur,"KNbrEngineers");
+  v[2]=VS(cur,"KWageEngineers");
+  v[0]+=v[1]*v[2];
+ }
 
-RESULT(v[0] ) 
+RESULT(v[0] )
 
 /****************************************************************/
 /******************** PROUCT INNOVATION *************************/
@@ -4533,10 +4303,10 @@ if(INCR("tInno",1)<0)
  END_EQUATION(0);
 
 v[17]=V("RdExpenditure");
- 
+
 V("Trade");
 cur1=SEARCH_CND("IdPNeed",0);
-cur=SEARCH_CNDS(cur1,"IdCh",2); 
+cur=SEARCH_CNDS(cur1,"IdCh",2);
 v[2]=VS(cur,"x"); // check the current quality level of the produced good
 v[4]=V("product"); // the sector in which the firm is currently producing
 v[6]=V("ProdShockP")*v[2]; // productivity shock that determines the variance of the product innovation
@@ -4545,7 +4315,7 @@ v[6]=V("ProdShockP")*v[2]; // productivity shock that determines the variance of
 v[0]=V("zInno"); //probability of hitting an innovation
 for(v[14]=v[9]=0; v[9]<v[17]; v[9]++)
 {
- if(RND<v[0]) 
+ if(RND<v[0])
  {
    v[8]=norm(v[2],v[6]); // outcome of the product innovation
    if(v[8]>v[2])
@@ -4556,7 +4326,7 @@ for(v[14]=v[9]=0; v[9]<v[17]; v[9]++)
      v[10]=V("innoInterval");
      WRITE("tInno",-1*v[10]);
     }
- }   
+ }
 }
 
 RESULT(v[14] )
@@ -4582,7 +4352,7 @@ Decide whether to order new capital.
 v[0]=V("Waiting");
 if(v[0]==1)
  END_EQUATION(CURRENT);
- 
+
 V("MaxLaborProductivity");
 v[3]=V("CapitalCapacity");
 v[4]=V("ExpectedSales");
@@ -4600,14 +4370,14 @@ v[60]=V("DesiredQ");
 v[9]=(v[4]*(1+v[51])-v[50]*0.1+v[5])*v[7]; // add stocks' gap to the equation
 
 
-
-v[23]=V("LaborCapacity")*2;
+v[6] = V("ExtraCapacity");
+v[23]=V("LaborCapacity")*v[6];
 v[24]=min(v[9],v[23]);//increase K if it is the bottleneck, considering also LaborCapacity
 v[10]=v[24]-v[3];
 v[11]=max(v[10],0);
 if(v[11]==0)
  END_EQUATION(0);
- 
+
 v[12]=v[11]*v[8];//desired capital
 
 END_EQUATION(v[12]);
@@ -4624,14 +4394,14 @@ v[18]=max(0,v[14]) ;//financial constraints
 v[20]=VL("NetWorth",1)-V("DebtF");//Financial feasibility
 if(v[20]>=v[12]*v[16])
  {
-  WRITE("RationingRatioFirm",1); 
+  WRITE("RationingRatioFirm",1);
   END_EQUATION(v[12]);
  }
 
 v[21]=v[20]/(v[16]*v[12]);
 v[12]*=v[21];
 
-WRITE("RationingRatioFirm",v[21]); 
+WRITE("RationingRatioFirm",v[21]);
 
 
 RESULT(v[12] )
@@ -4647,7 +4417,7 @@ v[1]=CURRENT;
 if(v[1]==-1)
   v[0]=V("Profit");
 else
-  v[0]=v[1]*0.9+0.1*V("Profit");  
+  v[0]=v[1]*0.9+0.1*V("Profit");
 RESULT(v[0] )
 
 EQUATION("BacklogValue")
@@ -4692,54 +4462,45 @@ CYCLES(p->up, cur, "Capital")
   v[4]=VS(cur,"K");
   v[7]=VS(cur,"KAge");
   v[8]=pow(1-v[6],v[7]);
-  
+
   v[0]+=v[2]*v[4]*v[8]*v[3]/v[5];
  }
 
 RESULT(v[0] )
-
-
-
-
-
-
-
-
-
-
-
-
-  
-
-
-
-
-
-
-
-
-
-
 
 EQUATION("PlaceOrder")
 /*
 Place the order from the calling firm to a Kapital producer adopting the technology of the firm
  */
 
-//sprintf(msg, "\n PlaceOrder %lf", v[3] ); plog(msg); 
+//sprintf(msg, "\n PlaceOrder %lf", v[3] ); plog(msg);
 
 //v[44]=VLS(c,"NetWorth",1);
-v[0]=VS(c,"IdTech"); //this is the technology of the firm
-
+v[82]=v[71] = V("IsEnergyK");
+if(v[82]==0)
+ {
+  v[0]=VS(c,"IdTech"); //this is the technology of the final product firm
+  v[30]=VS(c,"betaPrice");
+  v[31]=VS(c,"betaProd");
+  v[32]=VS(c,"betaTime");
+  v[11]=VS(c,"betaEff"); //add betaEff as a parameter
+  v[3]=VS(c,"KapitalNeed");
+}
+else
+ {
+  v[0]=VS(c,"IdTechEN"); //this is the technology of the energy firm
+  v[30]=VS(c,"betaPriceEN");
+  v[31]=VS(c,"betaProdEN");
+  v[32]=VS(c,"betaTimeEN");
+  //v[11]=VS(c,"betaEffEN"); //add betaEff as a parameter
+  v[11]=1;//assuming energy firms are not interested in the consumption of energy
+  v[3]=VS(c,"KapitalNeedEF");
+ }
+ 
 //assuming there are many firms producing K with the same technologies, firm select the one they prefer in terms of price and productivity of the capital, and waiting time (insert also durability of the capital if we include depreciation as a function of production quantity and not time)
 v[51]=v[53]=v[59]=v[60]=v[58]=v[70]=v[11]=v[12]=v[13]=v[14]=v[15]=v[16]=v[17]=v[18]=0;
-//given the preference of the buyer firm wth respect to the features of the capital production, namely price and current productivity of the capital, and approximate time to wait for receiving the order & the energy efficiency 
-v[30]=VS(c,"betaPrice");
-v[31]=VS(c,"betaProd");
-v[32]=VS(c,"betaTime");
-v[11]=VS(c,"betaEff"); //add betaEff as a parameter
-v[3]=VS(c,"KapitalNeed");
-//check and evaluate the available supply
+//given the preference of the buyer firm wth respect to the features of the capital production, namely price and current productivity of the capital, and approximate time to wait for receiving the order & the energy efficiency
+
 
 CYCLE(cur, "KFirm")
 {
@@ -4752,7 +4513,7 @@ CYCLE(cur, "KFirm")
   v[13]+=v[12];
   v[60]++;
   v[64]=VS(cur,"NumOrders");
-  
+
   v[54]=VS(cur,"KQ");//number of productive workers
   // WRITES(cur,"WaitTime",ceil(v[3]/v[54]));
   WRITES(cur,"WaitTime",1);
@@ -4760,17 +4521,17 @@ CYCLE(cur, "KFirm")
   {
     CYCLES(cur, cur1, "Order")
     {
-      
+
       v[55]=VS(cur1,"KCompletion");
       v[56]=VS(cur1,"KAmount");
       v[57]=(v[56]-v[55])/v[54];
       INCRS(cur,"WaitTime",v[57]);
     }
   }
-  
+
   v[65]=VS(cur,"WaitTime");
   if(v[65]<0)
-    INTERACTS(cur, "Neg. waittime", v[65]);
+    INTERACTS(c, "Neg. waittime", v[65]);
   v[58]+=v[65];
   // an index that gives the amount of time needed or a firm to complete the production of the capital already ordered
 }
@@ -4796,7 +4557,7 @@ CYCLE(cur, "KFirm")
     WRITES(cur,"kapp",0);
   else
     WRITES(cur,"kapp",1);
-  v[20]=VLS(cur,"KPrice",1); 
+  v[20]=VLS(cur,"KPrice",1);
   v[21]=VLS(cur,"CurrentProductivity",1);
   v[15]=VLS(cur,"CurrentEfficiency",1); // retrieve current efficiency
   v[26]=VS(cur,"WaitTime");
@@ -4805,11 +4566,10 @@ CYCLE(cur, "KFirm")
   v[28]=v[21]/v[62]+1; // Normalize Productivity
   v[16]=v[15]/v[14]+1; // Normalize Efficiency
   v[29]=v[26]/v[63]+1; // Normalize Wait Time
-  if(v[27]*v[28]*v[29]*v[16]==0) 
+  if(v[27]*v[28]*v[29]*v[16]==0)
     v[33]=0;
-  else 
-    // Do not include energy price and minimum wage here
-    v[33]=pow(v[28],v[31])*pow(v[29],-v[32])*pow(v[27],-v[30])*pow(v[16],-v[11]);
+  else// Do not include energy price and minimum wage here
+    v[33]=pow(v[28],v[31])*pow(v[29],-v[32])*pow(v[27],-v[30])*pow(v[16],v[11]);
   //v[33]=pow(v[28]*v[17],v[31])*pow(v[29],-v[32])*pow(v[27],-v[30])*pow(v[16]*v[18],v[11]); // Includes priceEN and MinWage
   WRITES(cur,"kselect",v[33]*VS(cur,"kapp"));
   v[70]+=v[33];
@@ -4818,88 +4578,61 @@ CYCLE(cur, "KFirm")
     v[81]=v[33];
     cur1=cur;
   }
-  
+
 }
 
       //Legend:
       //c: it is the final producer firm ordering the K
       //cur: is the K producer
-      
+
       cur=cur1;
       v[6]=VLS(cur,"KPrice",1);
       if(VS(cur,"NumOrders")==0)
         cur1=SEARCHS(cur,"Order");
-      else	
+      else
         cur1=ADDOBJS(cur,"Order");
-      
-      WRITES(cur1,"GreenOrder",0);
-      
+
+      //WRITES(cur1,"GreenOrder",0); Useless in the transit model
+
       //if(v[44]<v[3]*v[6])
       //v[63]=v[44]/v[6]; //REMOVED THE RATIONING DUE TO INSUFFICIENT NETWORTH
       //else
       v[63]=v[3]; // v[3]=V("KapitalNeed")
-      
-      WRITES(c,"RationingRatioFirm",v[63]/v[3]); // Set RationingRatioFirm = 1, see line above
+
+     // WRITES(c,"RationingRatioFirm",v[63]/v[3]); // Set RationingRatioFirm = 1, see line above
       WRITES(cur1,"KAmount",v[63]);
-      if(v[63]<0)
-        INTERACT("Neg.KAmount",v[63]);
+      if(v[63]<=0)
+        INTERACTS(c,"Neg.KAmount",v[63]);
       WRITES(cur1,"KCompletion",0);
       WRITES(cur1,"TimeWaited",1);
-      
+      WRITES(cur1, "EnergyKOrder", v[71]);
       cur1->hook=c; //useful to retrieve quickly the ordering firm
-      
-      
+
+
       INCRS(cur,"NumOrders",1);
       v[4]=VLS(cur,"CurrentProductivity",1); //current state of the K art
       WRITES(cur1,"Kproductivity",v[4]); //tech characteristics of the capital stock order
-      
+
       v[90]=VLS(cur,"CurrentEfficiency",1); //lagged CurrentEfficiency, correct to non lagged if necessary
       WRITES(cur1,"KEfficiency",v[90]); // efficiency of the capital stock order
-      
+
       //v[5]=VLS(cur,"CurrentSkillBiais",1);
       //WRITES(cur1,"KSkillBiais",v[5]);
       WRITES(cur1,"KP",v[6]);// write the price of the capital in the period in which it is ordered, and use it to compute the actual expenditure using the `agreed' price.
-      v[71]=VS(c,"IdFirm");
-      WRITES(cur1,"IdClient",v[71]);
+      if(v[71]==0)
+        v[72]=VS(c,"IdFirm");
+      else
+        v[72]=VS(c,"IdFirmEN");
+      WRITES(cur1,"IdClient",v[72]);
 
 RESULT(1 )
-  
-  
-  
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 EQUATION("KNbrEngineers")
 /*
-Number of enginers is a share of the number of blue collars. 
+Number of enginers is a share of the number of blue collars.
 */
-	
+
 v[8]=V("EngineersShare");
 v[9]=VS(p->up,"KNbrWorkers"); // number of first tier worker as a max to chose the number of engineers
 v[11]=v[9]*v[8];
@@ -4966,7 +4699,7 @@ RESULT((v[0]*v[1]) )
 
 EQUATION("KWagePrem")
 /*
-Wage premia distributed, when available to all classes of executives. 
+Wage premia distributed, when available to all classes of executives.
 */
 
 v[0]=V("KProfit");
@@ -4985,7 +4718,7 @@ if(v[5]>0)
       v[3]+=v[2];
      }
    }
-   
+
   CYCLE(cur, "KLabor")
    {
     v[10]=VS(cur,"IdKLabor");
@@ -5008,7 +4741,7 @@ v[1]=0;
 CYCLES(p->up, cur, "Order")
  {
   v[11]=VS(cur,"KAmount");
-  v[12]=VS(cur,"KCompletion"); 
+  v[12]=VS(cur,"KCompletion");
   v[1]+=v[11]-v[12];
  }
 v[15]=0;
@@ -5017,7 +4750,7 @@ CYCLE_SAFES(p->up, cur, "KLabor")
   if(VLS(cur,"KNbrWorkers",1)>0)
     v[15]++;
   else
-    DELETE(cur);  
+    DELETE(cur);
  }
 v[14]=V("IdKLabor");
 if(v[14]==1)
@@ -5028,16 +4761,15 @@ if(v[14]==1)
   v[3]=v[4]*(v[1]/v[2]);
   v[5]=V("KaNW");
   v[6]=v[0]*v[5]+(1-v[5])*v[3];
-  
-  v[26] = VL("UnemploymentRate", 1);
+	v[26] = VL("UnemploymentRate", 1);
   v[28]=v[6]-v[0];
   if(v[28]>0)
    {
     v[28]*=v[26];
     v[6]=v[0]+v[28];
-   } 
-   
-  v[33]=v[3]>v[6]?v[3]-v[6]:0;   
+   }
+
+  v[33]=v[3]>v[6]?v[3]-v[6]:0;
   v[54]=v[33]/v[6];
   WRITES(p->up,"KVacancies",v[33]);
   WRITES(p->up,"KRatioVacancies",v[54]);
@@ -5047,7 +4779,7 @@ if(v[14]==1)
 else
  {// when above the first tier workers...
   v[18]=V("IdKLabor");
-  cur=SEARCH_CNDS(p->up,"IdKLabor",v[18]-1); 
+  cur=SEARCH_CNDS(p->up,"IdKLabor",v[18]-1);
   v[19]=VS(cur,"KNbrWorkers"); //and the number of workers in the previous tier
   v[21]=VS(cur,"knu"); //given the worker ratio between tiers n the tier below
   v[6]=v[19]/v[21]; // compute the required executives
@@ -5055,7 +4787,7 @@ else
   INCRS(p->up,"KVacancies",v[6]*v[54]);
   v[17]=V("knu"); //given the worker ratio between tiers in the present tier
   if(v[6]>=v[17] && v[18]==v[15])
-   { 
+   {
     cur1=ADDOBJ_EXS(p->up,"KLabor",p);
     WRITES(cur1,"IdKLabor",v[18]+1);
     v[20]=v[6]/v[17];
@@ -5082,7 +4814,7 @@ else
       v[45]=VS(cur2->up,"SRMultiplier");
       v[46]=v[44]*(1-v[45])+v[45];
       WRITES(cur3,"SavingRate",v[46]);
-      
+
       WRITES(cur3,"NumClass",v[18]+1);
       WRITELS(cur3,"Expenditure",0, t-1);
       WRITELS(cur3,"ShareWageIncome",0, t-1);
@@ -5092,7 +4824,7 @@ else
       // WRITELS(cur3,"NumIterations",0, t-1); to reactivate when NumIterations report the number of consumers in the labour class, as given in equation "ShareWageIncome". Otherwise the number of iterations simply define the number of representative conusmers (groups) in a class
       WRITELS(cur3,"ShareIncome",0, t-1); // reset the share income to be recomputed
       WRITES(cur3,"Individuals",v[20]); // set the number of individuals to nu;ber of workers of the new class
-      v[35]=VS(cur2,"LorenzInd"); 
+      v[35]=VS(cur2,"LorenzInd");
       WRITES(cur3,"LorenzInd",v[35]+v[20]); // set total number of workers as previous total plus new workers
       WRITELS(cur3,"NoConsumption",0, t-1); // set the available income due to unavailability of goods to 0
       CYCLES(cur3, cur, "Need")
@@ -5107,7 +4839,7 @@ else
             if(v[28]==v[27])
              { // when in the same need as the one the new class is cycling cycle through the char of the preceding class
               CYCLES(cur4, cur5, "DCh")
-               { 
+               {
                 v[29]=VS(cur5,"IdDCh");
                 if(v[29]==v[26])// when in the same characteristic the new class is cycling
                  v[30]=VS(cur5,"tau"); // read the value of the tau parameter
@@ -5122,7 +4854,7 @@ else
           if(v[34]<0)
            v[33]=VS(p->up->up->up,"tauMin"); // the asympthotic level of the tolerance level (1 for qualities and 0 for price)
           v[32]=v[30]*(1-v[31])+v[31]*v[33]; // adjustment in the treshold level of tolerance
-          WRITES(cur1,"tau",v[32]); // finally write the tau for the new consumer class in each of its characteristic for each need      
+          WRITES(cur1,"tau",v[32]); // finally write the tau for the new consumer class in each of its characteristic for each need
          }
 
        }
@@ -5132,7 +4864,7 @@ else
      {
       cur3=SEARCH_CND("NumClass",v[18]+1);
       cur1->hook=cur3;
-     } 
+     }
    }
   if(v[18]>2 && v[19]<v[21])
    v[6]=0;
@@ -5154,19 +4886,19 @@ RESULT((v[0]*v[1]) )
 
 EQUATION("MinWage")
 /*
-Sets the minimum wage for all categories, as an aggregate relation. Variables influecing overall wage are: aggregate productivity, inflation, and unemployment. 
+Sets the minimum wage for all categories, as an aggregate relation. Variables influecing overall wage are: aggregate productivity, inflation, and unemployment.
 Aggregate productivity?
 Unemployment: to account for Beveridge curves we could use the suggishness in the hiring process, which gnerates rates of vacancies...
 NOTE: probably it makes sense to use levels for all variables. That is, when the variable reaches a certain level, a wage resetting is unedergone: if inflation runs too high, wages are renegotiated, if aggregate productivity increase evidently, wage are renegotiated.
 
 */
-//V("NbrWorkers");
+V("NbrWorkers");
 v[0]=VL("MinWage",1);
-END_EQUATION(v[0]);
-v[10]=V("InitAggProd"); //the reference level of productivity 
+//END_EQUATION(v[0]);
+v[10]=V("InitAggProd"); //the reference level of productivity
 v[2]=V("MovAvMaxLProd");
 v[43]=VL("MovAvMaxLProd",1);
-v[11]=V("IncrAggProd"); 
+v[11]=V("IncrAggProd");
 v[12]=v[10]+v[10]*v[11]; //required increase in productity to change the min wage
 v[13]=V("MovAvPrice");
 v[44]=VL("MovAvPrice",1);
@@ -5185,7 +4917,10 @@ v[32]=V("elasMinWage");
 v[33]=V("elasMWProd");
 v[34]=V("elasMWPrice");
 
-v[35]=v[19]/v[18]-1;
+if(v[18]!=0)
+ v[35]=v[19]/v[18]-1;
+else
+ v[35]=0; 
 v[36]=v[2]/v[10]-1;//Change in productivity
 v[37]=v[13]/v[14]-1; // Change in prices
 //v[36]=v[2]/v[43]-1; //Change in productivity
@@ -5198,32 +4933,32 @@ v[5]=v[30]+v[31]*pow(v[18],-v[32]);
 if(v[35]>0)
  v[38]=(-v[32]+0.05)*v[35];
 else
- v[38]=(-v[32]-0.05)*v[35];
+ v[38]=0;
 v[39]=0;
 v[40]=0;
 
 
 if(v[2]>v[12])
  {
- 
+
   v[30]=(v[12]/v[10])*v[30];
   v[31]=(v[12]/v[10])*v[31];
   v[39]=(v[33])*v[36];
   WRITE("InitAggProd",v[2]);
- // WRITE("IncrAggProd",v[11]*v[2]/v[10]);  
+ // WRITE("IncrAggProd",v[11]*v[2]/v[10]);
  }
 
 
 if(v[13]>v[16])
  {
- 
+
   v[30]=(v[16]/v[14])*v[30];
   v[31]=(v[16]/v[14])*v[31];
   v[40]=(v[34])*v[37];
   WRITE("InitAvPrice",v[13]);
- // WRITE("IncrAvPrice",v[15]*v[13]/v[14]);  
+ // WRITE("IncrAvPrice",v[15]*v[13]/v[14]);
  }
- 
+
 if(v[2]>v[12] & v[13]>v[16])
  {
   v[39]=(v[33])*v[36]*0.5;
@@ -5241,9 +4976,16 @@ v[48]=V("InitMinWage");
 v[41]=-v[32]*log(v[19]/100);
 v[42]=-v[32]*log(v[18]/100);
 v[6]=v[0]+exp(v[41])-exp(v[42])+v[39]*v[48]+v[40]*v[48];
-
+//INTERACT("TEST",v[41])
 //v[6]=v[0]+v[39]*v[0]+v[40]*v[0];
 
+if(is_nan( v[6] )!=0 || is_inf(v[6])!=0)
+ {
+  v[6]=v[0];
+//  INTERACT("UNO", v[0]);
+ } 
+ 
+//  INTERACT("Due", v[6]);
 if(v[2]>v[12] | v[13]>v[16])
  WRITE("InitMinWage",v[6]);
 
@@ -5286,13 +5028,13 @@ v[5]=0;
 v[10]=v[20]=v[21]=v[22]=v[23]=0;
 CYCLE(cur, "KFirm")
  {v[20]++;
- 	v[7]=VS(cur,"KNbrEngineers");	
+ 	v[7]=VS(cur,"KNbrEngineers");
  	v[10]+=v[7];
     v[8]=VS(cur,"KProductionFlow");
     v[5]+=v[8];
   v[21]+=VS(cur,"KProfit");
-  v[22]+=VS(cur,"KCumProfit"); 
-  v[23]+=VS(cur,"CurrentProductivity"); 
+  v[22]+=VS(cur,"KCumProfit");
+  v[23]+=VS(cur,"CurrentProductivity");
    CYCLES(cur, cur1, "KLabor")
     {
      v[6]=VS(cur1,"KNbrWorkers");
@@ -5300,7 +5042,7 @@ CYCLE(cur, "KFirm")
     }
 
  }
- 
+
 WRITE("AvCurrentProductivity",v[23]/v[20]);
 WRITE("AvKProfit",v[21]/v[20]);
 //WRITE("AvKCumProfit",v[22]/v[0]);
@@ -5475,10 +5217,10 @@ CYCLE(cur,"Firm")
   v[0]+=VS(cur,"Vacancies");
   v[1]++;
  }
- 
+
 CYCLE(cur,"KFirm")
  {
-  v[0]+=VS(cur,"KVacancies");  
+  v[0]+=VS(cur,"KVacancies");
  }
 
 WRITE("AvRatioVacancies",v[0]/(v[1]+v[0])*100);
@@ -5551,6 +5293,7 @@ v[0]=VL("STUnemployment",1);
 v[1]=V("UnemploymentRate");
 if(t==1)
  END_EQUATION(v[1]);
+
 v[2]=V("aSTUR");
 
 v[3]=v[0]*v[2]+(1-v[2])*v[1];
@@ -5562,7 +5305,6 @@ EQUATION("NbrWorkers")
 
 */
 
-V("Demography");
 v[3]=v[8]=0;
 CYCLE(cur2, "Supply")
  {
@@ -5575,7 +5317,7 @@ CYCLE(cur2, "Supply")
       v[3]+=v[1];
       v[8]+=v[2];
      }
-  
+
    }
  }
 CYCLE(cur, "KFirm")
@@ -5594,12 +5336,6 @@ CYCLE(cur, "KFirm")
   v[8]+=v[7];
  }
 
-v[10] = V("TotLaborForce");
-v[11] = V("TotKLaborForce");
-v[12]=v[11]+v[10];
-//if( abs(v[12]-v[3])>0.001)
- //INTERACT("Labor force error", v[12]);
-//LOG("%lf \t%lf\n", v[12],v[3]);
 RESULT(v[3] )
 
 
@@ -5618,7 +5354,7 @@ RESULT(v[4] )
 
 EQUATION("ComputeShare")
 /*
-The Share is a function that is called when a classed is formed to determine the shares of expenditure across needs, as a change with respect to the previous class. 
+The Share is a function that is called when a classed is formed to determine the shares of expenditure across needs, as a change with respect to the previous class.
 he dynamic mimics engels laws (shiting the share of expenditures toward different needs, thus reducing the expenditure on 'basic' needs, as income increases)
 This Share function simply normalise the shares computed in ExpShares
 */
@@ -5627,7 +5363,7 @@ v[1]=SUM("ExpShare"); //compute the sum of the newly computed expenditure shares
 v[4]=v[7]=0;
 CYCLE(cur, "Need")
  { // cycle through the needs
-  v[2]=VS(cur,"ExpShare"); 
+  v[2]=VS(cur,"ExpShare");
   v[3]=v[2]/v[1]; // normalise the share
   WRITES(cur,"Share",v[3]); // and fix it
   v[4]+=v[3]; // check that the sum is equal to 1
@@ -5651,7 +5387,7 @@ v[5]=V("IdNeed");
 v[3]=V("endExpShare"); // asymptotic value of the expenditure share for the current need (defined in the beginning symmetric to the first class distribution of shares)
 CYCLES(p->up->up, cur, "Class")
  {
-  v[4]=VS(cur,"NumClass"); 
+  v[4]=VS(cur,"NumClass");
   if(v[4]==v[2]-1)
    { // select the class below the one for which the shares are computed
     CYCLES(cur, cur1, "Need")
@@ -5690,7 +5426,7 @@ if(v[0]==1)
   INTERACT("InitInProgress",1);
   END_EQUATION(-1);
  }
-WRITE("InProgress",1); 
+WRITE("InProgress",1);
 V("Init_x");
 
 v[22]=VL("MinWage",1);
@@ -5714,7 +5450,7 @@ CYCLE(cur4, "Supply")
     if(VS(cur6, "IdsFirm")!=-1)
      cur6=ADDOBJS(cur5,"sFirm");
 
-    WRITES(cur6,"IdsFirm",VS(cur1, "IdFirm")); 
+    WRITES(cur6,"IdsFirm",VS(cur1, "IdFirm"));
     cur1->hook=cur6;
     cur6->hook=cur1;
     CYCLES(cur1,cur, "Labor")
@@ -5741,7 +5477,7 @@ CYCLE(cur4, "Supply")
         v[9]=min(v[1],v[8]);
         //v[2]=VLS(cur1,"MaxLaborProductivity",1);
         v[4]=VS(cur1,"DesiredUnusedCapacity");
-        v[3]=v[4]*(v[9]/v[2]); // number of workers in the first layer in the first period	
+        v[3]=v[4]*(v[9]/v[2]); // number of workers in the first layer in the first period
         WRITELLS(cur,"NumWorkers",v[3],t,1);
         WRITELS(cur,"NumWorkers",v[3],t);
         v[21]=VS(cur,"wagecoeff");
@@ -5751,7 +5487,7 @@ CYCLE(cur4, "Supply")
       else
        {// when above the first tier workers...
         v[18]=VS(cur,"IdLabor");
-        cur2=SEARCH_CNDS(cur->up,"IdLabor",v[18]-1); 
+        cur2=SEARCH_CNDS(cur->up,"IdLabor",v[18]-1);
         v[17]=VS(cur2,"nu"); //given the worker ratio between tiers of the tier below
         v[19]=VS(cur2,"NumWorkers"); //and the number of workers in the previous tier
         v[6]=v[19]/v[17]; // compute the required executives
@@ -5773,7 +5509,7 @@ CYCLE(cur4, "Supply")
           WRITELS(cur3,"wage",v[28], t-1);
          }
        }
-  
+
      }
    }
  }
@@ -5833,7 +5569,7 @@ CYCLE(cur2, "Supply")
       v[3]+=v[1];
       v[8]+=v[2];
      }
-  
+
    }
  }
 CYCLE(cur, "KFirm")
@@ -5854,7 +5590,7 @@ CYCLE(cur, "KFirm")
    }
   cur2=SEARCHS(cur,"KEngineers");
   cur3=SEARCH_CND("NumClass",0);
-  cur2->hook=cur3;  
+  cur2->hook=cur3;
   v[6]=VS(cur2,"KNbrEngineers");
   v[7]=VLS(cur2,"KNbrEngineers",1);
   v[3]+=v[6];
@@ -6063,7 +5799,7 @@ CYCLE(cur, "Demand")
        }
 
      }
-    if(v[1]>1) 
+    if(v[1]>1)
      { // exectuives, above the first tier workers
       CYCLES(cur1, cur2, "Need")
        {
@@ -6128,7 +5864,7 @@ CYCLE(cur, "Demand")
      { // first tier workers
       CYCLES(cur1, cur2, "Need")
        {
-        CYCLES(cur2, cur3, "DCh")         
+        CYCLES(cur2, cur3, "DCh")
         {
           v[3]=VS(cur3,"tauMinW"); // minimum level of tolerance toward the best product in the market, for workers
           v[4]=VS(cur3,"tauMaxW"); // maximum level of tolerance toward the best product in the market, for wokers
@@ -6271,7 +6007,7 @@ CYCLE(cur, "Class")
   v[1]=VS(cur,"NumClass");
   if(v[1]>v[2])
    {
-    v[2]=v[1];  
+    v[2]=v[1];
     v[3]=VS(cur,"Income"); // Top class income
    }
   if(v[1]==2)
@@ -6293,7 +6029,7 @@ CYCLE(cur, "Class")
   if(v[1]>v[2])
    {
     v[2]=v[1];
-    v[3]=VS(cur,"WageIncome"); //Top class earings 
+    v[3]=VS(cur,"WageIncome"); //Top class earings
    }
   if(v[2]==2)
    v[4]=VS(cur,"WageIncome"); // Bottom class wage
@@ -6355,7 +6091,7 @@ if(v[10]>1)
       WRITES(cur1,"LorenzInd",v[9]);
      }
     SORTS(cur,"Class","NumClass", "UP");
-  
+
    }
  }
 
@@ -6421,7 +6157,7 @@ if(v[16]>1)
     CYCLES(cur, cur1, "Class")
      {
       v[4]=VS(cur1,"Individuals");
-      v[5]=VS(cur1,"Income"); 
+      v[5]=VS(cur1,"Income");
       if(v[5]>0 && v[4]>0.01)
        {
         v[7]=v[5]/v[4]; // av. income of the class
@@ -6439,9 +6175,9 @@ if(v[16]>1)
       v[30]+=1;
       v[40]+=v[41];
      }
-  
+
    }
-  
+
   v[12]=v[10]/v[11];
   v[13]=1/(1-v[8]);
   v[14]=pow(v[12],v[13]);
@@ -6487,7 +6223,7 @@ CYCLE(cur, "Demand")
        {
         v[8]=VS(cur2,"NumClass");
         if(v[8]!=v[7])
-         { // if it is a different class 
+         { // if it is a different class
           v[9]=VS(cur2,"ShareIncome");
           if(v[9]>0)
            {
@@ -6546,20 +6282,20 @@ CYCLE(cur, "Machinery")
    {
     v[5]=VS(cur1,"KProductionFlow");
     v[6]=VS(cur1,"KPrice");
-    v[11]=VS(cur1,"KConstPrice");    
+    v[11]=VS(cur1,"KConstPrice");
     v[8]+=v[6]*v[5];
     v[10]+=v[11]*v[5];
    }
 
  }
- 
+
 v[20]=V("priceEN");
 v[21]=V("TotEnergyConsumption");
 v[22]=v[20]*v[21];
 
 WRITE("GdpConstant_lag",V("GdpConstant"));
 
- 
+
 v[11]=v[9]+v[10]+v[21];
 v[12]=v[4]+v[8]+v[22];
 if(v[12]==0)
@@ -6605,7 +6341,7 @@ if(v[1]<v[2])
 
  }
 else
- v[8]=V("GdpNominal"); 
+ v[8]=V("GdpNominal");
 
 RESULT(v[8] )
 
@@ -6766,23 +6502,23 @@ CYCLE(cur, "Sectors")
   VS(cur,"Demography");
   WRITES(cur,"AvxS",0);
   WRITES(cur,"SUnitSales",0);
-  WRITES(cur,"SQ",0); 
-  WRITES(cur,"SRevenues",0);   
+  WRITES(cur,"SQ",0);
+  WRITES(cur,"SRevenues",0);
   WRITES(cur,"SProfits",0);
-  WRITES(cur,"SNumFirms",0); 
-  WRITES(cur,"SMonetarySales",0); 
+  WRITES(cur,"SNumFirms",0);
+  WRITES(cur,"SMonetarySales",0);
   WRITES(cur,"Sapp",VS(cur,"maxXS"));
-  WRITES(cur,"maxXS",0); 
-  WRITES(cur,"AvpS",0);   
-  WRITES(cur,"SInvHerf",0);   
+  WRITES(cur,"maxXS",0);
+  WRITES(cur,"AvpS",0);
+  WRITES(cur,"SInvHerf",0);
   WRITES(cur,"SAvHealth",0);
-  WRITES(cur,"SAvStock",0); 
-  WRITES(cur,"SAvBacklog",0); 
-  WRITES(cur,"SKProductivity",0); 
-  WRITES(cur,"SULC",0); 
-  WRITES(cur,"SnumBLI",0);      
-  WRITES(cur,"SNetWorth",0);      
-  WRITES(cur,"SAvAge",0); 
+  WRITES(cur,"SAvStock",0);
+  WRITES(cur,"SAvBacklog",0);
+  WRITES(cur,"SKProductivity",0);
+  WRITES(cur,"SULC",0);
+  WRITES(cur,"SnumBLI",0);
+  WRITES(cur,"SNetWorth",0);
+  WRITES(cur,"SAvAge",0);
   WRITES(cur,"SBacklogShare",0);
 
  }
@@ -6801,10 +6537,10 @@ CYCLE(cur, "Supply")
     INCRS(cur1->hook->up, "AvpS", v[30]*VS(cur1,"price"));
     INCRS(cur1->hook->up, "SProfits", VS(cur1,"Profit"));
     INCRS(cur1->hook->up, "SMonetarySales", VS(cur1,"MonetarySales"));
-    INCRS(cur1->hook->up, "SNumFirms", 1);    
+    INCRS(cur1->hook->up, "SNumFirms", 1);
     WRITES(cur1,"MsSector",VS(cur1, "MonetarySales"));
-    INCRS(cur1->hook->up, "SKProductivity", VS(cur1,"MaxLaborProductivity")*v[30]); 
-    INCRS(cur1->hook->up, "SULC", VS(cur1,"UnitLaborCost")*v[30]);            
+    INCRS(cur1->hook->up, "SKProductivity", VS(cur1,"MaxLaborProductivity")*v[30]);
+    INCRS(cur1->hook->up, "SULC", VS(cur1,"UnitLaborCost")*v[30]);
 
     CYCLES(cur1, cur2, "PNeed")
      {
@@ -6834,16 +6570,16 @@ CYCLE(cur1, "Firm")
  {
   v[20]=VS(cur1->hook->up,"SMonetarySales");
   v[21]=VS(cur1,"MsSector");
-  
+
   if(v[20]>0)
    v[23]=v[21]/v[20];
   else
-   v[23]=0; 
+   v[23]=0;
   WRITES(cur1,"MsSector",v[23]);
   INCRS(cur1->hook->up,"SAvHealth",v[23]*VS(cur1,"Health"));
   INCRS(cur1->hook->up,"SInvHerf",v[23]*v[23]);
   INCRS(cur1->hook->up,"SAvStock",v[23]*VS(cur1,"Stocks"));
-  INCRS(cur1->hook->up,"SAvBacklog",v[23]*VS(cur1,"backlog"));  
+  INCRS(cur1->hook->up,"SAvBacklog",v[23]*VS(cur1,"backlog"));
   v[42]=VS(cur1,"AvWage");
   v[43]=VS(cur1,"LaborForce");
   v[40]+=v[42]*v[43];
@@ -6852,7 +6588,7 @@ CYCLE(cur1, "Firm")
 if(t>1)
  v[44]=V("TotAvWage");
 else
- v[44]=v[40]/v[41]; 
+ v[44]=v[40]/v[41];
 WRITE("TotAvWage",v[40]/v[41]);
 v[45]=(v[40]/v[41]-v[44])/v[44];
 WRITE("WageGrowth",v[45]);
@@ -6861,28 +6597,28 @@ CYCLE(cur1, "Sectors")
  {
   v[27]=VS(cur1,"SInvHerf");
   if(v[27]>0)
-   WRITES(cur1,"SInvHerf",1/v[27]); 
+   WRITES(cur1,"SInvHerf",1/v[27]);
   v[30]=VS(cur1,"SQ");
   if(v[30]>0)
    {
     MULTS(cur1,"AvxS",1/v[30]);
-    MULTS(cur1,"SKProductivity",1/v[30]); 
-    MULTS(cur1,"SULC",1/v[30]);        
-    MULTS(cur1,"AvpS",1/v[30]); 
-    MULTS(cur1,"SBacklogShare",1/v[30]);     
-           
+    MULTS(cur1,"SKProductivity",1/v[30]);
+    MULTS(cur1,"SULC",1/v[30]);
+    MULTS(cur1,"AvpS",1/v[30]);
+    MULTS(cur1,"SBacklogShare",1/v[30]);
+
    }
   else
    {
     WRITES(cur1,"maxXS",VS(cur1,"Sapp"));
-   } 
+   }
   v[17]=VS(cur1,"SNumFirms");
   if(v[17]>0)
    {
     MULTS(cur1,"SnumBLI",1/v[17]);
     MULTS(cur1,"SNetWorth",1/v[17]);
-    MULTS(cur1,"SAvAge",1/v[17]);    
-   }  
+    MULTS(cur1,"SAvAge",1/v[17]);
+   }
  }
 
 v[5]=v[3]/v[4];
@@ -6920,7 +6656,7 @@ CYCLES(p->up, cur, "Supply")
      }
    }
 
- } 
+ }
 WRITE("TotSalesS",v[4]);
 CYCLES(p->up, cur, "Supply")
  {
@@ -6983,7 +6719,7 @@ v[0]=v[10]=0;
 CYCLE(cur, "Sectors")
  {
  v[1]=VS(cur,"SectSales");
- v[0]+=v[1]; 
+ v[0]+=v[1];
  }
 v[2]=v[0];
 CYCLE(cur, "Sectors")
@@ -6993,12 +6729,12 @@ CYCLE(cur, "Sectors")
  	v[3]=0;
  else
 	 v[3]=v[1]/v[2];
- WRITES(cur,"SectSalesShare",v[3]); 
+ WRITES(cur,"SectSalesShare",v[3]);
  v[10]+=(v[3]*v[3]);
  }
 if(v[10]==0)
 	v[11]=0;
-else 
+else
 	v[11]=1/v[10];
 RESULT(v[11] )
 
@@ -7011,7 +6747,7 @@ CYCLE(cur, "Sectors")
  {
  v[1]=VS(cur,"SectMechanisation");
  v[2]=VS(cur,"SectEmploymentShare");
- v[0]+=(v[1]*v[2]); 
+ v[0]+=(v[1]*v[2]);
  }
 v[3]=v[0];
 RESULT(v[3] )
@@ -7057,13 +6793,13 @@ CYCLE(cur, "Machinery")
 		CYCLES(cur1, cur2, "KEngineers")
  		{
   		v[7]=VS(cur2,"KNbrEngineers");
-      v[1]+=v[7];	
+      v[1]+=v[7];
  		}
-	  v[15]=VS(cur1,"KProductionFlow"); 
+	  v[15]=VS(cur1,"KProductionFlow");
     v[16]=VS(cur1,"KPrice");
-    v[11]+=(v[15]*v[16]); 
+    v[11]+=(v[15]*v[16]);
     v[26]=VS(cur1,"KConstPrice");
-    v[21]+=v[15]; 
+    v[21]+=v[15];
    }
 	v[8]=v[1]+v[2];
 	v[9]=v[8]/v[4];
@@ -7165,8 +6901,8 @@ CYCLE(cur, "Country")
   v[0]=VS(cur,"InProgress");
   if(v[0]==0)
     VS(cur,"Init");
-  else  
-    VS(cur,"InitInProgress");  
+  else
+    VS(cur,"InitInProgress");
  }
 PARAMETER
 RESULT(1 )
@@ -7204,7 +6940,7 @@ CYCLE(cur, "Firm")
  {
   v[0]+=VS(cur,"DebtF");
   v[1]+=VS(cur,"BalanceF");
-  
+
  }
 CYCLE(cur, "KFirm")
  {
@@ -7245,13 +6981,13 @@ CYCLE(cur, "Firm")
     cur2=SEARCH_CND("NumClass",v[1]);
     cur1->hook=cur2;
    }
-  v[31]=0; 
+  v[31]=0;
   CYCLES(cur,cur1, "Capital")
   {
       v[31]+=VS(cur1, "K");
       WRITELLS(cur1, "KAge", 1, t-1,t-1);
   }
-  
+
   WRITELLS(cur, "CapitalStock",v[31],t-1,t-1);
   cur3=SEARCHS(cur,"BankF");
   cur3->hook=cur8;
@@ -7279,26 +7015,20 @@ CYCLE(cur, "KFirm")
     cur2=SEARCH_CND("NumClass",v[4]);
     cur1->hook=cur2;
    }
-  cur3=SEARCHS(cur,"KEngineers"); 
+  cur3=SEARCHS(cur,"KEngineers");
   cur3->hook=cur7;
   if(VS(cur, "NumOrders")>0)
   {
   CYCLES(cur, cur1, "Order")
    {
-    if(VS(cur1, "GreenOrder")==0)
-     {
       v[5]=VS(cur1,"IdClient");
-      cur3=SEARCH_CND("IdFirm",v[5]);
+      if(VS(cur1,"EnergyKOrder")==0)
+       cur3=SEARCH_CND("IdFirm",v[5]);
+      else
+       cur3=SEARCH_CND("IdFirmEN",v[5]);        
       cur1->hook=cur3;
-     } 
-    else
-     {
-      cur3 = SEARCH("Energy");
-      cur1->hook=cur3;
-     
-     } 
    }
-  } 
+  }
   else
   {v[40]=0;
   CYCLES(cur, cur1, "Order")
@@ -7306,11 +7036,11 @@ CYCLE(cur, "KFirm")
     cur1->hook=NULL;
     WRITES(cur1, "IdClient", -1);
    }
-  } 
- 
+  }
+
   cur1=SEARCHS(cur,"BankK");
   cur1->hook=cur8;
-  
+
  }
 
 
@@ -7318,16 +7048,18 @@ V("TauInit");
 V("ShareInit");
 
 v[40]=0;
-CYCLE(cur1,"Energy")
-	{
-	CYCLES(cur1,cur, "GreenCapital")
-  	{
-    	  v[40]+=VS(cur, "GreenK");
-      	WRITELLS(cur, "GreenKAge", 1, t-1,t-1);
-  	}
-  WRITELLS(cur1, "GreenCapitalStock",v[40],t-1,t-1);
-	}
 
+
+CYCLE(cur1,"EnergyFirm")
+	{
+	CYCLES(cur1,cur, "LaborEF")
+  	{
+  	 v[41] = VS(cur, "IdLaborEF");
+    cur2 = SEARCH_CND("NumClass", v[41]);
+    cur->hook=cur2;
+  	}
+	}
+V("InitPP");
 
 RESULT( 1)
 
@@ -7357,13 +7089,11 @@ CYCLE(cur, "Firm")
   if(v[3]>1)
     INTERACTS(cur, "Excess K",v[3]);
   if(v[0]==0 && v[3]>0)
-    INTERACTS(cur, "Ghost K", v[3]);  
-	
+    INTERACTS(cur, "Ghost K", v[3]);
+
 }
 
 RESULT(1 )
-
-
 
 
 MODELEND
@@ -7401,10 +7131,3 @@ Notes, just to not forget:
 
 
 */
-
-
-
-
-
-
-
